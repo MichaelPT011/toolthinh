@@ -1,0 +1,386 @@
+"""Image generation tab."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPlainTextEdit,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from core.config import SAFE_IMAGE_PRESET
+from gui.base_worker import BaseWorker
+from gui.batch_widgets import BatchWidget
+
+
+class FlowWorker(BaseWorker):
+    """Run one image generation job."""
+
+    def __init__(self, generator, prompt: str, account_id: str, **kwargs: object) -> None:
+        super().__init__()
+        self.generator = generator
+        self.prompt = prompt
+        self.account_id = account_id
+        self.kwargs = kwargs
+
+    async def _run_async(self):
+        return await self.generator.generate(
+            self.prompt,
+            self.account_id,
+            cancel_event=self.cancel_event,
+            progress_callback=self.progress.emit,
+            status_callback=self.status.emit,
+            **self.kwargs,
+        )
+
+
+class FlowTab(QWidget):
+    """Prompt to image tab."""
+
+    def __init__(self, flow_gen, auth, batch_engine) -> None:
+        super().__init__()
+        self.flow_gen = flow_gen
+        self.auth = auth
+        self.batch_engine = batch_engine
+        self.reference_image_path: str | None = None
+        self._worker: FlowWorker | None = None
+        self._current_row: int | None = None
+        self._init_ui()
+        self.reload_accounts()
+
+    def _init_ui(self) -> None:
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(14)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        account_row = QHBoxLayout()
+        self.account_combo = QComboBox()
+        refresh_btn = QPushButton("Tải lại")
+        refresh_btn.clicked.connect(self.reload_accounts)
+        account_row.addWidget(self.account_combo)
+        account_row.addWidget(refresh_btn)
+        account_widget = QWidget()
+        account_widget.setLayout(account_row)
+        form.addRow("Hồ sơ đang dùng", account_widget)
+
+        self.prompt_input = QPlainTextEdit()
+        self.prompt_input.setPlaceholderText("Mô tả ảnh bạn muốn tạo")
+        self.prompt_input.setMinimumHeight(120)
+        form.addRow("Mô tả ảnh", self.prompt_input)
+
+        self.num_images_spin = QSpinBox()
+        self.num_images_spin.setRange(1, 4)
+        self.num_images_spin.setValue(1)
+        form.addRow("Số ảnh tải về", self.num_images_spin)
+
+        self.quality_combo = QComboBox()
+        self.quality_combo.addItems(["1080p", "2K", "4K"])
+        form.addRow("Chất lượng tải", self.quality_combo)
+
+        self.orientation_combo = QComboBox()
+        self.orientation_combo.addItem("Ngang (16:9)", "landscape")
+        self.orientation_combo.addItem("Dọc (9:16)", "portrait")
+        form.addRow("Khung hình", self.orientation_combo)
+
+        self.reference_label = QLabel("Chưa chọn ảnh tham chiếu")
+        ref_row = QHBoxLayout()
+        ref_row.setContentsMargins(0, 0, 0, 0)
+        ref_row.addWidget(self.reference_label, 1)
+        ref_browse = QPushButton("Chọn ảnh")
+        ref_clear = QPushButton("Xóa")
+        ref_browse.clicked.connect(self._browse_reference_image)
+        ref_clear.clicked.connect(self._clear_reference_image)
+        ref_row.addWidget(ref_browse)
+        ref_row.addWidget(ref_clear)
+        ref_widget = QWidget()
+        ref_widget.setLayout(ref_row)
+        form.addRow("Ảnh tham chiếu", ref_widget)
+        layout.addLayout(form)
+
+        actions = QHBoxLayout()
+        self.safe_preset_btn = QPushButton("Preset an toàn")
+        self.batch_btn = QPushButton("Tạo hàng loạt ⛓️")
+        self.gen_btn = QPushButton("Tạo ngay bây giờ👍")
+        self.stop_btn = QPushButton("Dừng")
+        self.stop_btn.setEnabled(False)
+        self.safe_preset_btn.clicked.connect(self._apply_safe_preset)
+        self.batch_btn.clicked.connect(self._toggle_batch)
+        self.gen_btn.clicked.connect(self._generate)
+        self.stop_btn.clicked.connect(self._stop_current_job)
+        actions.addStretch(1)
+        actions.addWidget(self.safe_preset_btn)
+        actions.addWidget(self.batch_btn)
+        actions.addWidget(self.stop_btn)
+        actions.addWidget(self.gen_btn)
+        layout.addLayout(actions)
+
+        self.batch_widget = BatchWidget(
+            self.flow_gen,
+            self.auth,
+            self.batch_engine,
+            "flow",
+            self._build_batch_rows,
+            self._describe_batch_logic,
+            self,
+        )
+        self.batch_widget.setVisible(False)
+        layout.addWidget(self.batch_widget)
+
+        self.safe_hint = QLabel("Preset an toàn ảnh: 1 ảnh, 1080p, ngang, batch song song 2.")
+        self.safe_hint.setWordWrap(True)
+        layout.addWidget(self.safe_hint)
+
+        self.progress = QProgressBar()
+        self.progress.setVisible(False)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        layout.addWidget(self.progress)
+
+        self.progress_label = QLabel("")
+        self.progress_label.setWordWrap(True)
+        layout.addWidget(self.progress_label)
+
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["#", "Mô tả", "Trạng thái", "Tệp đầu ra", "Bắt đầu"])
+        self.table.setAlternatingRowColors(True)
+        self.table.setWordWrap(False)
+        self.table.setMinimumHeight(220)
+        self.table.verticalHeader().setDefaultSectionSize(40)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self.table)
+        layout.addStretch(1)
+
+        self.scroll.setWidget(container)
+        outer.addWidget(self.scroll)
+        self._apply_safe_preset(startup=True)
+
+    def reload_accounts(self) -> None:
+        current = self.account_combo.currentData()
+        self.account_combo.clear()
+        for account in self.auth.get_active_accounts():
+            self.account_combo.addItem(account.get("nickname", "Hồ sơ"), account["account_id"])
+        if current:
+            index = self.account_combo.findData(current)
+            if index >= 0:
+                self.account_combo.setCurrentIndex(index)
+
+    def _browse_reference_image(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Chọn ảnh tham chiếu", "", "Tệp ảnh (*.png *.jpg *.jpeg *.webp)")
+        if path:
+            self.reference_image_path = path
+            self.reference_label.setText(Path(path).name)
+
+    def _clear_reference_image(self) -> None:
+        self.reference_image_path = None
+        self.reference_label.setText("Chưa chọn ảnh tham chiếu")
+
+    def _toggle_batch(self) -> None:
+        visible = not self.batch_widget.isVisible()
+        self.batch_widget.setVisible(visible)
+        self.batch_btn.setText("Ẩn tạo hàng loạt" if visible else "Tạo hàng loạt ⛓️")
+        if visible:
+            self.batch_widget.refresh_from_parent()
+            QTimer.singleShot(0, lambda: self.scroll.ensureWidgetVisible(self.batch_widget))
+
+    def _apply_safe_preset(self, startup: bool = False) -> None:
+        self.num_images_spin.setValue(int(SAFE_IMAGE_PRESET["num_images"]))
+        quality_index = self.quality_combo.findText(str(SAFE_IMAGE_PRESET["download_quality"]))
+        if quality_index >= 0:
+            self.quality_combo.setCurrentIndex(quality_index)
+        orientation_index = self.orientation_combo.findData(SAFE_IMAGE_PRESET["orientation"])
+        if orientation_index >= 0:
+            self.orientation_combo.setCurrentIndex(orientation_index)
+        mode_index = self.batch_widget.mode_combo.findData(SAFE_IMAGE_PRESET["batch_mode"])
+        if mode_index >= 0:
+            self.batch_widget.mode_combo.setCurrentIndex(mode_index)
+        self.batch_widget.concurrent_spin.setValue(int(SAFE_IMAGE_PRESET["batch_concurrent"]))
+        if not startup:
+            self.progress_label.setText("Đã áp dụng preset an toàn cho tab Ảnh.")
+
+    def _generate(self) -> None:
+        prompt = self.prompt_input.toPlainText().strip()
+        account_id = self.account_combo.currentData()
+        if not prompt or not account_id:
+            QMessageBox.warning(self, "Ảnh Flow", "Hãy nhập mô tả ảnh và chọn hồ sơ.")
+            return
+
+        if not getattr(self.flow_gen, "flow_automation", None):
+            QApplication.clipboard().setText(prompt)
+
+        self.gen_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress_label.setText("Đang chuẩn bị gửi yêu cầu tạo ảnh...")
+        self._current_row = self._start_job_row(prompt)
+
+        self._worker = FlowWorker(
+            self.flow_gen,
+            prompt,
+            account_id,
+            image_path=self.reference_image_path,
+            num_images=self.num_images_spin.value(),
+            download_quality=self.quality_combo.currentText(),
+            orientation=self.orientation_combo.currentData(),
+            launch_browser=not getattr(self.flow_gen, "flow_automation", None),
+        )
+        self._worker.progress.connect(self._on_progress)
+        self._worker.status.connect(self._on_status)
+        self._worker.finished.connect(self._on_finished)
+        self._worker.error.connect(self._on_error)
+        self._worker.cancelled.connect(self._on_cancelled)
+        self._worker.start()
+
+    def _stop_current_job(self) -> None:
+        if self._worker:
+            self.stop_btn.setEnabled(False)
+            self.progress_label.setText("Đang dừng tác vụ ảnh...")
+            self._worker.request_cancel()
+
+    def _on_progress(self, value: int) -> None:
+        self.progress.setVisible(True)
+        self.progress.setValue(max(0, min(100, value)))
+        if self._current_row is not None:
+            self._set_job_row_status(self._current_row, f"Đang chạy {max(0, min(100, value))}%")
+
+    def _on_status(self, text: str) -> None:
+        self.progress_label.setText(text)
+        if self._current_row is not None:
+            self._set_job_row_status(self._current_row, text)
+
+    def _on_finished(self, job: object) -> None:
+        self.gen_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        if isinstance(job, dict):
+            if job.get("status") == "completed":
+                self.progress.setVisible(True)
+                self.progress.setValue(100)
+                self.progress_label.setText(f"Đã tạo xong và tải về {len(job.get('output_paths', []))} ảnh.")
+            else:
+                self.progress.setVisible(False)
+                self.progress_label.setText(job.get("error", "") or f"Kết thúc với trạng thái: {job.get('status', '')}")
+            self._finish_job_row(job)
+        else:
+            self.progress.setVisible(False)
+            self.progress_label.setText("")
+        self._current_row = None
+
+    def _on_error(self, message: str) -> None:
+        self.gen_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        self.progress.setVisible(False)
+        self.progress_label.setText(message)
+        if self._current_row is not None:
+            self._set_job_row_status(self._current_row, "failed")
+            self._set_job_row_output(self._current_row, message)
+        self._current_row = None
+        QMessageBox.critical(self, "Ảnh Flow", message)
+
+    def _on_cancelled(self, message: str) -> None:
+        self.gen_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        self.progress.setVisible(False)
+        self.progress_label.setText(message)
+        if self._current_row is not None:
+            self._set_job_row_status(self._current_row, "cancelled")
+            self._set_job_row_output(self._current_row, message)
+        self._current_row = None
+
+    def _start_job_row(self, prompt: str) -> int:
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
+        self.table.setItem(row, 1, QTableWidgetItem(prompt))
+        self.table.setItem(row, 2, QTableWidgetItem("Đang khởi tạo..."))
+        self.table.setItem(row, 3, QTableWidgetItem(""))
+        self.table.setItem(row, 4, QTableWidgetItem(""))
+        return row
+
+    def _set_job_row_status(self, row: int, status: str) -> None:
+        item = self.table.item(row, 2)
+        if item:
+            item.setText(status)
+
+    def _set_job_row_output(self, row: int, output: str) -> None:
+        item = self.table.item(row, 3)
+        if item:
+            item.setText(output)
+
+    def _finish_job_row(self, job: dict) -> None:
+        if self._current_row is None:
+            return
+        self._set_job_row_status(self._current_row, job.get("status", ""))
+        self._set_job_row_output(self._current_row, " | ".join(job.get("output_paths", [])) or job.get("error", ""))
+        started_item = self.table.item(self._current_row, 4)
+        if started_item:
+            started_item.setText(job.get("started_at", ""))
+
+    def _build_batch_rows(self, prompts: list[str], assets: dict) -> list[dict]:
+        sequence_files = list(assets.get("sequence_files") or [])
+        shared_reference = self.reference_image_path
+        rows: list[dict] = []
+
+        if sequence_files and len(sequence_files) not in {1, len(prompts)}:
+            raise ValueError("Batch ảnh tham chiếu cần đúng 1 ảnh dùng chung hoặc đúng bằng số prompt.")
+
+        for index, prompt in enumerate(prompts):
+            image_path = None
+            if sequence_files:
+                image_path = sequence_files[0] if len(sequence_files) == 1 else sequence_files[index]
+            elif shared_reference:
+                image_path = shared_reference
+
+            rows.append(
+                {
+                    "prompt": prompt,
+                    "kwargs": {
+                        "image_path": image_path,
+                        "num_images": self.num_images_spin.value(),
+                        "download_quality": self.quality_combo.currentText(),
+                        "orientation": self.orientation_combo.currentData(),
+                    },
+                    "source_label": Path(image_path).name if image_path else "Không dùng ảnh tham chiếu",
+                    "gen_type": "flow",
+                }
+            )
+        return rows
+
+    def _describe_batch_logic(self) -> str:
+        return (
+            "Ảnh hàng loạt: nếu bạn nạp 1 ảnh thì toàn bộ prompt dùng chung ảnh đó. "
+            "Nếu nạp nhiều ảnh thì prompt thứ N sẽ đi với ảnh thứ N."
+        )

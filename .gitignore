@@ -1,0 +1,17 @@
+.venv/
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+__pycache__/
+*.pyc
+*.pyo
+
+data/
+output/
+build/
+release/
+dist/
+chrome-win64/
+
+.bootstrap_stamp
