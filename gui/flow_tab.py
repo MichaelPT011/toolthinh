@@ -236,6 +236,32 @@ class FlowTab(QWidget):
         if not startup:
             self.progress_label.setText("Đã áp dụng preset an toàn cho tab Ảnh.")
 
+    def _on_safe_preset_toggled(self, checked: bool) -> None:
+        if checked:
+            self._apply_safe_preset(startup=True)
+            self.progress_label.setText("Dang dung preset an toan cho tab Anh.")
+        self.num_images_spin.setEnabled(not checked)
+        self.quality_combo.setEnabled(not checked)
+        self.orientation_combo.setEnabled(not checked)
+        self.batch_widget.mode_combo.setEnabled(not checked)
+        self.batch_widget.concurrent_spin.setEnabled(not checked)
+        self.safe_preset_btn.setText("Dang dung preset an toan" if checked else "Dung preset an toan")
+
+    def _generation_readiness_warning(self) -> str | None:
+        if not self.auth.get_active_accounts() or not self.account_combo.currentData():
+            return (
+                "Ban chua them tai khoan Flow/VEO3.\n\n"
+                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
+                "dang nhap xong roi quay lai tao."
+            )
+        if self.browser_assist and not self.browser_assist.has_browser_profile_data():
+            return (
+                "Ban chua dang nhap Flow/VEO3 trong browser cua app.\n\n"
+                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
+                "dang nhap xong roi quay lai tao."
+            )
+        return None
+
     def _generate(self) -> None:
         prompt = self.prompt_input.toPlainText().strip()
         account_id = self.account_combo.currentData()
