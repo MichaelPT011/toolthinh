@@ -12,10 +12,12 @@ import sys
 import webbrowser
 from pathlib import Path
 
+from core.browser_installer import BrowserInstallError, BrowserInstaller
 from core.config import (
     BUNDLED_CHROME_DIR,
     BUNDLED_CHROME_NESTED_DIR,
     FLOW_HOME_URL,
+    MANAGED_BROWSER_DIR,
     MANAGED_BUNDLED_CHROME_DATA_DIR,
     MANAGED_CHROME_DATA_DIR,
     WHISK_TOOL_URL,
@@ -35,6 +37,7 @@ class BrowserAssist:
 
     def __init__(self, settings: dict) -> None:
         self.settings = dict(settings)
+        self.browser_installer = BrowserInstaller()
 
     def update_settings(self, settings: dict) -> None:
         self.settings = dict(settings)
@@ -42,7 +45,7 @@ class BrowserAssist:
     def launch_tool(self, tool: str, prompt: str = "", image_paths: list[str] | None = None) -> None:
         url = self.TOOL_URLS[tool]
         del prompt
-        browser_path = self._resolve_browser_path()
+        browser_path = self._resolve_browser_path(allow_install=True)
         user_data_dir = self._effective_user_data_dir()
         profile_dir = self._effective_profile_dir()
         if browser_path:
@@ -83,7 +86,7 @@ class BrowserAssist:
 
     def launch_login_browser(self) -> None:
         """Open the managed browser profile to the official Flow page."""
-        browser_path = self._resolve_browser_path()
+        browser_path = self._resolve_browser_path(allow_install=True)
         user_data_dir = self._effective_user_data_dir()
         profile_dir = self._effective_profile_dir()
         if browser_path:
@@ -109,6 +112,7 @@ class BrowserAssist:
     def describe_environment(self) -> dict:
         return {
             "browser_path": self._resolve_browser_path() or "",
+            "auto_download_browser": self.can_auto_install_browser(),
             "chrome_user_data_dir": self._effective_user_data_dir(),
             "chrome_profile_dir": self._effective_profile_dir(),
             "downloads_dir": str(Path(self.settings.get("downloads_dir") or Path.home() / "Downloads").expanduser()),
@@ -194,10 +198,17 @@ class BrowserAssist:
             imported.append(str(target))
         return imported
 
-    def _resolve_browser_path(self) -> str | None:
+    def can_auto_install_browser(self) -> bool:
+        return self.browser_installer.can_auto_install()
+
+    def _resolve_browser_path(self, allow_install: bool = False) -> str | None:
         configured = self.settings.get("browser_path", "").strip()
         if configured and Path(configured).exists():
             return configured
+
+        managed = self.browser_installer.installed_browser_path()
+        if managed:
+            return managed
 
         candidates = [
             Path.home() / "AppData/Local/Google/Chrome/Application/chrome.exe",
@@ -209,13 +220,19 @@ class BrowserAssist:
             Path("/usr/bin/google-chrome-stable"),
             BUNDLED_CHROME_DIR / "chrome.exe",
             BUNDLED_CHROME_NESTED_DIR / "chrome.exe",
-            Path("G:/Tool veo/chrome-win64/chrome-win64/chrome.exe"),
         ]
         for candidate in candidates:
             if candidate.exists():
                 return str(candidate)
         found = shutil.which("chrome") or shutil.which("chrome.exe")
-        return found
+        if found:
+            return found
+        if allow_install and self.browser_installer.can_auto_install():
+            try:
+                return self.browser_installer.ensure_browser()
+            except BrowserInstallError as exc:
+                logger.error("Auto-install browser failed: %s", exc)
+        return None
 
     def _effective_user_data_dir(self) -> str:
         configured = self.settings.get("chrome_user_data_dir", "").strip()
@@ -227,7 +244,8 @@ class BrowserAssist:
             (BUNDLED_CHROME_DIR / "chrome.exe").resolve(),
             (BUNDLED_CHROME_NESTED_DIR / "chrome.exe").resolve(),
         }
-        if browser_file and browser_file in bundled_paths:
+        managed_browser_root = MANAGED_BROWSER_DIR.resolve()
+        if browser_file and (browser_file in bundled_paths or managed_browser_root in browser_file.parents):
             return str(MANAGED_BUNDLED_CHROME_DATA_DIR)
         return str(MANAGED_CHROME_DATA_DIR)
 

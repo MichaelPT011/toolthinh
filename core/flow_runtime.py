@@ -28,7 +28,7 @@ class FlowBrowserRuntime:
 
     async def __aenter__(self):
         _playwright_error, _playwright_timeout_error, async_playwright = self.playwright_loader()
-        browser_path = self.browser_assist._resolve_browser_path()
+        browser_path = self.browser_assist._resolve_browser_path(allow_install=True)
         if not browser_path:
             raise RuntimeError("Chrome executable was not found. Set Chrome path in Settings first.")
 

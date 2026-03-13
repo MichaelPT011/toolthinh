@@ -22,21 +22,28 @@ class EnvironmentChecker:
 
         browser_path = self.browser_assist._resolve_browser_path()
         if browser_path:
-            checks.append(self._ok("Browser", f"Tìm thấy browser: {browser_path}"))
+            checks.append(self._ok("Browser", f"Tim thay browser: {browser_path}"))
+        elif self.browser_assist.can_auto_install_browser():
+            checks.append(
+                self._warning(
+                    "Browser",
+                    "May chua co Chrome san. App co the tu tai browser chinh thuc khi can.",
+                )
+            )
         else:
-            checks.append(self._error("Browser", "Không tìm thấy browser. App sẽ không thể chạy automation."))
+            checks.append(self._error("Browser", "Khong tim thay browser va cung khong the tu tai."))
 
         downloads_dir = Path(self.settings.get("downloads_dir") or Path.home() / "Downloads").expanduser()
-        checks.append(self._check_directory("Thư mục tải xuống", downloads_dir))
+        checks.append(self._check_directory("Thu muc tai xuong", downloads_dir))
 
         output_dir = Path(self.settings.get("output_dir") or "").expanduser()
-        checks.append(self._check_directory("Thư mục đầu ra", output_dir))
+        checks.append(self._check_directory("Thu muc dau ra", output_dir))
 
         user_data_dir = Path(self.browser_assist._effective_user_data_dir()).expanduser()
-        checks.append(self._check_directory("Thư mục dữ liệu browser", user_data_dir))
+        checks.append(self._check_directory("Thu muc du lieu browser", user_data_dir))
 
         profile_dir = str(self.settings.get("chrome_profile_dir") or "Default").strip() or "Default"
-        checks.append(self._ok("Profile browser", f"Đang dùng profile: {profile_dir}"))
+        checks.append(self._ok("Profile browser", f"Dang dung profile: {profile_dir}"))
 
         checks.append(self._check_active_accounts())
         checks.append(self._check_update_manifest())
@@ -70,26 +77,26 @@ class EnvironmentChecker:
             probe = directory / ".write_test"
             probe.write_text("ok", encoding="utf-8")
             probe.unlink(missing_ok=True)
-            return self._ok(title, f"Sẵn sàng ghi dữ liệu: {directory}")
+            return self._ok(title, f"Co the ghi du lieu vao: {directory}")
         except Exception as exc:
-            return self._error(title, f"Không thể ghi vào {directory}: {exc}")
+            return self._error(title, f"Khong the ghi vao {directory}: {exc}")
 
     def _check_active_accounts(self) -> dict:
         if self.auth is None:
-            return self._warning("Đăng nhập Flow", "Không kiểm tra được trạng thái đăng nhập từ màn hình này.")
+            return self._warning("Dang nhap Flow", "Khong kiem tra duoc trang thai dang nhap tu man hinh nay.")
         try:
             active = len(self.auth.get_active_accounts())
         except Exception:
             active = 0
         if active > 0:
-            return self._ok("Đăng nhập Flow", f"Đang có {active} hồ sơ hoạt động.")
+            return self._ok("Dang nhap Flow", f"Dang co {active} ho so hoat dong.")
         return self._warning(
-            "Đăng nhập Flow",
-            "Chưa có hồ sơ hoạt động. Hãy mở tab Tài khoản và đăng nhập Flow trước khi tạo.",
+            "Dang nhap Flow",
+            "Chua co ho so hoat dong. Hay mo tab Tai khoan va dang nhap Flow truoc khi tao.",
         )
 
     def _check_update_manifest(self) -> dict:
-        return self._ok("Auto update", f"Đã khóa nguồn cập nhật chính thức: {OFFICIAL_UPDATE_MANIFEST_URL}")
+        return self._ok("Auto update", f"Da khoa nguon cap nhat chinh thuc: {OFFICIAL_UPDATE_MANIFEST_URL}")
 
     def _check_download_folder_health(self, downloads_dir: Path) -> list[dict]:
         checks: list[dict] = []
@@ -97,12 +104,12 @@ class EnvironmentChecker:
         if stale_partial:
             checks.append(
                 self._warning(
-                    "Tải xuống dang dở",
-                    f"Có {len(stale_partial)} file tải dở trong thư mục Downloads. Nên xóa để tránh app nhận nhầm.",
+                    "Tai xuong dang do",
+                    f"Co {len(stale_partial)} file tai do trong Downloads. Nen xoa de tranh app nhan nham.",
                 )
             )
         else:
-            checks.append(self._ok("Tải xuống dang dở", "Không có file tải dở gây nhiễu."))
+            checks.append(self._ok("Tai xuong dang do", "Khong co file tai do gay nhieu."))
 
         very_large_count = 0
         try:
@@ -115,27 +122,27 @@ class EnvironmentChecker:
         if very_large_count > 300:
             checks.append(
                 self._warning(
-                    "Thư mục Downloads",
-                    "Downloads đang có rất nhiều file media. Nên dọn bớt để app theo dõi nhanh và chính xác hơn.",
+                    "Thu muc Downloads",
+                    "Downloads dang co rat nhieu file media. Nen don bot de app theo doi nhanh va chinh xac hon.",
                 )
             )
         else:
-            checks.append(self._ok("Thư mục Downloads", "Số lượng file media trong Downloads đang ở mức an toàn."))
+            checks.append(self._ok("Thu muc Downloads", "So luong file media trong Downloads dang o muc an toan."))
         return checks
 
     def _check_playwright(self) -> dict:
         try:
             importlib.import_module("playwright.async_api")
-            return self._ok("Playwright", "Thư viện automation đã sẵn sàng.")
+            return self._ok("Playwright", "Thu vien automation da san sang.")
         except Exception as exc:
-            return self._error("Playwright", f"Thiếu hoặc lỗi Playwright: {exc}")
+            return self._error("Playwright", f"Thieu hoac loi Playwright: {exc}")
 
     async def _check_browser_launch(self, browser_path: str) -> dict:
         try:
             module = importlib.import_module("playwright.async_api")
             async_playwright = module.async_playwright
         except Exception as exc:
-            return self._error("Mở browser thử nghiệm", f"Không thể nạp Playwright để test browser: {exc}")
+            return self._error("Mo browser thu nghiem", f"Khong the nap Playwright de test browser: {exc}")
 
         try:
             with tempfile.TemporaryDirectory(prefix="veo3_env_check_") as temp_dir:
@@ -158,15 +165,15 @@ class EnvironmentChecker:
                         await page.goto("https://example.com", wait_until="domcontentloaded", timeout=60000)
                     finally:
                         await context.close()
-            return self._ok("Mở browser thử nghiệm", "Browser automation mở và đóng thử thành công.")
+            return self._ok("Mo browser thu nghiem", "Browser automation mo va dong thu thanh cong.")
         except Exception as exc:
-            return self._error("Mở browser thử nghiệm", f"Browser automation chưa chạy ổn: {exc}")
+            return self._error("Mo browser thu nghiem", f"Browser automation chua chay on: {exc}")
 
     def _render_report(self, checks: list[dict], ok_count: int, warning_count: int, error_count: int) -> str:
         lines = [
-            "BÁO CÁO KIỂM TRA MÔI TRƯỜNG",
+            "BAO CAO KIEM TRA MOI TRUONG",
             "",
-            f"OK: {ok_count} | Cảnh báo: {warning_count} | Lỗi: {error_count}",
+            f"OK: {ok_count} | Canh bao: {warning_count} | Loi: {error_count}",
             "",
         ]
         icons = {"ok": "OK", "warning": "CANH BAO", "error": "LOI"}

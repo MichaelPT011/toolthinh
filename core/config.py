@@ -16,10 +16,15 @@ OUTPUT_DIR = ROOT_DIR / "output"
 DEFAULT_DOWNLOADS_DIR = Path.home() / "Downloads"
 MANAGED_CHROME_DATA_DIR = DATA_DIR / "chrome-user-data"
 MANAGED_BUNDLED_CHROME_DATA_DIR = DATA_DIR / "chrome-user-data-bundled"
+MANAGED_BROWSER_DIR = DATA_DIR / "managed-browser"
 UPDATE_CACHE_DIR = DATA_DIR / "updates"
 VERSION_FILE = ROOT_DIR / "version.json"
 BUNDLED_CHROME_DIR = ROOT_DIR / "chrome-win64"
 BUNDLED_CHROME_NESTED_DIR = ROOT_DIR / "chrome-win64" / "chrome-win64"
+CHROME_FOR_TESTING_JSON_URL = (
+    "https://googlechromelabs.github.io/chrome-for-testing/"
+    "last-known-good-versions-with-downloads.json"
+)
 
 OFFICIAL_UPDATE_REPO = "MichaelPT011/toolthinh"
 OFFICIAL_UPDATE_MANIFEST_URL = f"https://raw.githubusercontent.com/{OFFICIAL_UPDATE_REPO}/main/latest.json"
@@ -91,6 +96,7 @@ def ensure_dirs() -> None:
         OUTPUT_WHISK,
         MANAGED_CHROME_DATA_DIR,
         MANAGED_BUNDLED_CHROME_DATA_DIR,
+        MANAGED_BROWSER_DIR,
         UPDATE_CACHE_DIR,
     ]:
         directory.mkdir(parents=True, exist_ok=True)
