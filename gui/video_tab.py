@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -60,6 +61,7 @@ class VideoTab(QWidget):
         self.video_gen = video_gen
         self.auth = auth
         self.batch_engine = batch_engine
+        self.browser_assist = getattr(video_gen, "browser_assist", None)
         self.image_path: str | None = None
         self.start_image_path: str | None = None
         self.end_image_path: str | None = None

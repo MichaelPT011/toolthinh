@@ -121,6 +121,25 @@ class BrowserAssist:
             "downloads_dir": str(Path(self.settings.get("downloads_dir") or Path.home() / "Downloads").expanduser()),
         }
 
+    def has_browser_profile_data(self) -> bool:
+        user_data_dir = Path(self._effective_user_data_dir()).expanduser()
+        profile_dir = user_data_dir / self._effective_profile_dir()
+        if not profile_dir.exists():
+            return False
+        markers = [
+            profile_dir / "Preferences",
+            profile_dir / "Cookies",
+            profile_dir / "Network" / "Cookies",
+            profile_dir / "Login Data",
+            profile_dir / "Web Data",
+        ]
+        if any(marker.exists() for marker in markers):
+            return True
+        try:
+            return any(profile_dir.iterdir())
+        except OSError:
+            return False
+
     def current_download_snapshot(self, extensions: set[str] | None = None) -> set[Path]:
         download_dir = Path(self.settings.get("downloads_dir") or Path.home() / "Downloads").expanduser()
         download_dir.mkdir(parents=True, exist_ok=True)

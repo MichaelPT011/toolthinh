@@ -60,6 +60,7 @@ class FlowTab(QWidget):
         self.flow_gen = flow_gen
         self.auth = auth
         self.batch_engine = batch_engine
+        self.browser_assist = getattr(flow_gen, "browser_assist", None)
         self.reference_image_path: str | None = None
         self._worker: FlowWorker | None = None
         self._current_row: int | None = None
@@ -132,7 +133,10 @@ class FlowTab(QWidget):
         self.gen_btn = QPushButton("Tạo ngay bây giờ👍")
         self.stop_btn = QPushButton("Dừng")
         self.stop_btn.setEnabled(False)
-        self.safe_preset_btn.clicked.connect(self._apply_safe_preset)
+        self.safe_preset_btn.setCheckable(True)
+        self.safe_preset_btn.setChecked(True)
+        self.safe_preset_btn.setText("Dung preset an toan")
+        self.safe_preset_btn.toggled.connect(self._on_safe_preset_toggled)
         self.batch_btn.clicked.connect(self._toggle_batch)
         self.gen_btn.clicked.connect(self._generate)
         self.stop_btn.clicked.connect(self._stop_current_job)
@@ -185,13 +189,15 @@ class FlowTab(QWidget):
 
         self.scroll.setWidget(container)
         outer.addWidget(self.scroll)
-        self._apply_safe_preset(startup=True)
+        self._on_safe_preset_toggled(True)
 
     def reload_accounts(self) -> None:
         current = self.account_combo.currentData()
         self.account_combo.clear()
         for account in self.auth.get_active_accounts():
             self.account_combo.addItem(account.get("nickname", "Hồ sơ"), account["account_id"])
+        if self.account_combo.count() == 0:
+            self.account_combo.addItem("Chua co tai khoan Flow/VEO3", None)
         if current:
             index = self.account_combo.findData(current)
             if index >= 0:

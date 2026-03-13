@@ -166,7 +166,19 @@ class GoogleAuth:
         try:
             with open(ACCOUNTS_FILE, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
-            return data if isinstance(data, list) else []
+            if not isinstance(data, list):
+                return []
+            if len(data) == 1:
+                first = data[0] if isinstance(data[0], dict) else {}
+                if (
+                    first.get("nickname") == "Default profile"
+                    and not first.get("api_key")
+                    and not first.get("email")
+                    and not first.get("user_name")
+                    and not first.get("notes")
+                ):
+                    return []
+            return data
         except (OSError, json.JSONDecodeError) as exc:
             logger.error("Failed to load accounts: %s", exc)
             return []

@@ -75,8 +75,6 @@ def main(argv: list[str] | None = None) -> int:
     (output_base / "images").mkdir(parents=True, exist_ok=True)
 
     auth = GoogleAuth()
-    if not auth.get_accounts():
-        auth.add_account("Default profile")
 
     api_client = LabsAPIClient(auth)
     browser_assist = BrowserAssist(settings)

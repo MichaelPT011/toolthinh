@@ -495,6 +495,12 @@ class BatchWidget(QFrame):
         if not self.auth.get_active_accounts():
             QMessageBox.warning(self, "Tạo hàng loạt", "Hãy có ít nhất một hồ sơ đang hoạt động.")
             return
+        preflight_check = getattr(self.parent(), "_generation_readiness_warning", None)
+        if callable(preflight_check):
+            message = preflight_check()
+            if message:
+                QMessageBox.warning(self, "Batch", message)
+                return
         self._retry_rows(list(range(len(self.prompts))), reset_codes=True)
 
     def _retry_failed_rows(self) -> None:
