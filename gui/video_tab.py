@@ -166,7 +166,10 @@ class VideoTab(QWidget):
         self.gen_btn = QPushButton("Tạo ngay bây giờ👍")
         self.stop_btn = QPushButton("Dừng")
         self.stop_btn.setEnabled(False)
-        self.safe_preset_btn.clicked.connect(self._apply_safe_preset)
+        self.safe_preset_btn.setCheckable(True)
+        self.safe_preset_btn.setChecked(True)
+        self.safe_preset_btn.setText("Dung preset an toan")
+        self.safe_preset_btn.toggled.connect(self._on_safe_preset_toggled)
         self.batch_btn.clicked.connect(self._toggle_batch)
         self.gen_btn.clicked.connect(self._generate)
         self.stop_btn.clicked.connect(self._stop_current_job)
@@ -220,7 +223,7 @@ class VideoTab(QWidget):
         self.scroll.setWidget(container)
         outer.addWidget(self.scroll)
 
-        self._apply_safe_preset(startup=True)
+        self._on_safe_preset_toggled(True)
         self._update_mode_fields()
 
     def _build_file_row(self, label: QLabel, browse_handler, clear_handler) -> QWidget:
@@ -256,6 +259,8 @@ class VideoTab(QWidget):
         self.account_combo.clear()
         for account in self.auth.get_active_accounts():
             self.account_combo.addItem(account.get("nickname", "Hồ sơ"), account["account_id"])
+        if self.account_combo.count() == 0:
+            self.account_combo.addItem("Chua co tai khoan Flow/VEO3", None)
         if current:
             index = self.account_combo.findData(current)
             if index >= 0:
@@ -363,6 +368,33 @@ class VideoTab(QWidget):
         self.batch_widget.concurrent_spin.setValue(int(SAFE_VIDEO_PRESET["batch_concurrent"]))
         if not startup:
             self.progress_label.setText("Đã áp dụng preset an toàn cho tab Video.")
+
+    def _on_safe_preset_toggled(self, checked: bool) -> None:
+        if checked:
+            self._apply_safe_preset(startup=True)
+            self.progress_label.setText("Dang dung preset an toan cho tab Video.")
+        self.output_count_spin.setEnabled(not checked)
+        self.quality_combo.setEnabled(not checked)
+        self.ratio_combo.setEnabled(not checked)
+        self.duration_combo.setEnabled(not checked)
+        self.batch_widget.mode_combo.setEnabled(not checked)
+        self.batch_widget.concurrent_spin.setEnabled(not checked)
+        self.safe_preset_btn.setText("Dang dung preset an toan" if checked else "Dung preset an toan")
+
+    def _generation_readiness_warning(self) -> str | None:
+        if not self.auth.get_active_accounts() or not self.account_combo.currentData():
+            return (
+                "Ban chua them tai khoan Flow/VEO3.\n\n"
+                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
+                "dang nhap xong roi quay lai tao."
+            )
+        if self.browser_assist and not self.browser_assist.has_browser_profile_data():
+            return (
+                "Ban chua dang nhap Flow/VEO3 trong browser cua app.\n\n"
+                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
+                "dang nhap xong roi quay lai tao."
+            )
+        return None
 
     def _generate(self) -> None:
         prompt = self.prompt_input.toPlainText().strip()

@@ -190,18 +190,19 @@ class AccountTab(QWidget):
         if not self.browser_assist:
             QMessageBox.warning(self, "Trình duyệt", "Chưa cấu hình trình duyệt.")
             return
-        self.browser_assist.launch_login_browser()
-        env = self.browser_assist.describe_environment()
-        QMessageBox.information(
-            self,
-            "Đăng nhập Flow",
-            "Đã mở Chrome bằng đúng profile của app.\n\n"
-            "1. Đăng nhập tài khoản Flow/Labs trong cửa sổ đó.\n"
-            "2. Những lần chạy sau app tiếp tục dùng đúng profile này.\n\n"
-            f"Đường dẫn Chrome: {env['browser_path'] or '(tự động)'}\n"
-            f"Thư mục dữ liệu Chrome: {env['chrome_user_data_dir']}\n"
-            f"Tên profile Chrome: {env['chrome_profile_dir']}\n"
-            f"Thư mục tải xuống: {env['downloads_dir']}",
+        try:
+            self.browser_assist.launch_login_browser()
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Đăng nhập Flow",
+                f"Không mở được trình duyệt đăng nhập.\n\nChi tiết: {exc}",
+            )
+            return
+        self._refresh_browser_info()
+        self.browser_info.setText(
+            self.browser_info.text()
+            + "\n\nĐã mở cửa sổ đăng nhập Flow. Nếu cửa sổ chưa hiện ngay, chờ khoảng 2-5 giây."
         )
 
     def _refresh_browser_info(self) -> None:

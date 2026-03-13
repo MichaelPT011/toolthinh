@@ -19,6 +19,7 @@ from core.config import (
     BUNDLED_CHROME_DIR,
     BUNDLED_CHROME_NESTED_DIR,
     FLOW_HOME_URL,
+    FLOW_LOGIN_URL,
     MANAGED_BROWSER_DIR,
     MANAGED_BUNDLED_CHROME_DATA_DIR,
     MANAGED_CHROME_DATA_DIR,
@@ -92,6 +93,7 @@ class BrowserAssist:
         user_data_dir = self._effective_user_data_dir()
         profile_dir = self._effective_profile_dir()
         if browser_path:
+            self._close_existing_managed_browser(browser_path, user_data_dir)
             args = [browser_path]
             if user_data_dir:
                 args.append(f"--user-data-dir={user_data_dir}")
@@ -104,13 +106,14 @@ class BrowserAssist:
                     "--no-default-browser-check",
                     "--disable-session-crashed-bubble",
                     "--new-window",
-                    "--window-size=1440,960",
-                    FLOW_HOME_URL,
+                    "--window-size=1280,900",
+                    "--window-position=120,80",
+                    FLOW_LOGIN_URL,
                 ]
             )
-            self._launch_browser(args, center_window=True, browser_path=browser_path)
+            self._launch_browser(args)
             return
-        webbrowser.open(FLOW_HOME_URL)
+        webbrowser.open(FLOW_LOGIN_URL)
 
     def describe_environment(self) -> dict:
         return {
@@ -274,6 +277,27 @@ class BrowserAssist:
     def _effective_profile_dir(self) -> str:
         configured = self.settings.get("chrome_profile_dir", "").strip()
         return configured or "Default"
+
+    def _close_existing_managed_browser(self, browser_path: str, user_data_dir: str) -> None:
+        if sys.platform != "win32":
+            return
+        executable_name = Path(browser_path).name or "chrome.exe"
+        escaped_dir = str(Path(user_data_dir).resolve()).replace("'", "''")
+        script = (
+            f"$needle = [regex]::Escape('{escaped_dir}'); "
+            f"Get-CimInstance Win32_Process -Filter \"Name = '{executable_name}'\" | "
+            "Where-Object { $_.CommandLine -and $_.CommandLine -match $needle } | "
+            "ForEach-Object { "
+            "try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} "
+            "}"
+        )
+        subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        time.sleep(0.8)
 
     def _launch_browser(
         self,

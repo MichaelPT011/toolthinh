@@ -265,6 +265,10 @@ class FlowTab(QWidget):
     def _generate(self) -> None:
         prompt = self.prompt_input.toPlainText().strip()
         account_id = self.account_combo.currentData()
+        readiness_warning = self._generation_readiness_warning()
+        if readiness_warning:
+            QMessageBox.warning(self, "Anh Flow", readiness_warning)
+            return
         if not prompt or not account_id:
             QMessageBox.warning(self, "Ảnh Flow", "Hãy nhập mô tả ảnh và chọn hồ sơ.")
             return

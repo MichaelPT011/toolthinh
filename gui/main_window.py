@@ -270,7 +270,6 @@ class MainWindow(QMainWindow):
         environment_action.triggered.connect(self._check_environment)
         output_action.triggered.connect(self._open_output)
         tools_menu.addAction(login_browser_action)
-        tools_menu.addAction(update_action)
         tools_menu.addAction(environment_action)
         tools_menu.addAction(output_action)
 
@@ -326,6 +325,19 @@ class MainWindow(QMainWindow):
         self._auto_update_check_pending = False
 
         if not result.get("has_update"):
+            return
+
+        from gui.settings_dialog import load_settings
+
+        manager = UpdateManager(load_settings())
+        self.statusBar().showMessage("Đang tự cập nhật lên phiên bản mới...", 4000)
+        self._update_prepare_worker = UpdatePrepareWorker(manager, result, os.getpid())
+        self._update_prepare_worker.finished.connect(self._on_update_prepared)
+        self._update_prepare_worker.error.connect(self._on_update_check_error)
+        self._update_prepare_worker.start()
+        return
+
+        if not result.get("has_update"):
             if not auto_mode:
                 QMessageBox.information(
                     self,
@@ -358,6 +370,9 @@ class MainWindow(QMainWindow):
 
     def _on_update_prepared(self, result: object) -> None:
         self._update_prepare_worker = None
+        self.statusBar().showMessage("Đang cài bản cập nhật mới và tự mở lại...", 3000)
+        QApplication.quit()
+        return
         version = ""
         if isinstance(result, dict):
             version = str(result.get("remote_version") or "")
@@ -394,7 +409,11 @@ class MainWindow(QMainWindow):
         if not browser_assist:
             QMessageBox.warning(self, "Trình duyệt", "Chưa cấu hình trình duyệt.")
             return
-        browser_assist.launch_login_browser()
+        try:
+            browser_assist.launch_login_browser()
+        except Exception as exc:
+            QMessageBox.critical(self, "Đăng nhập Flow", f"Không mở được trình duyệt đăng nhập.\n\nChi tiết: {exc}")
+            return
         self.statusBar().showMessage("Đã mở trình duyệt đăng nhập Flow", 4000)
 
     def _check_environment(self) -> None:
