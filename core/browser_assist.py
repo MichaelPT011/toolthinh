@@ -5,10 +5,12 @@ watching the user's download folder for new files.
 from __future__ import annotations
 
 import asyncio
+import csv
 import logging
 import shutil
 import subprocess
 import sys
+import time
 import webbrowser
 from pathlib import Path
 
@@ -64,7 +66,7 @@ class BrowserAssist:
                     url,
                 ]
             )
-            subprocess.Popen(args)
+            self._launch_browser(args)
         else:
             webbrowser.open(url)
 
@@ -101,11 +103,12 @@ class BrowserAssist:
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-session-crashed-bubble",
-                    "--new-tab",
+                    "--new-window",
+                    "--window-size=1440,960",
                     FLOW_HOME_URL,
                 ]
             )
-            subprocess.Popen(args)
+            self._launch_browser(args, center_window=True, browser_path=browser_path)
             return
         webbrowser.open(FLOW_HOME_URL)
 
@@ -252,3 +255,95 @@ class BrowserAssist:
     def _effective_profile_dir(self) -> str:
         configured = self.settings.get("chrome_profile_dir", "").strip()
         return configured or "Default"
+
+    def _launch_browser(
+        self,
+        args: list[str],
+        *,
+        center_window: bool = False,
+        browser_path: str | None = None,
+    ) -> None:
+        existing_pids = self._list_browser_pids(browser_path or args[0]) if center_window else set()
+        subprocess.Popen(args)
+        if center_window:
+            self._center_browser_windows(browser_path or args[0], existing_pids)
+
+    def _list_browser_pids(self, browser_path: str) -> set[int]:
+        if sys.platform != "win32":
+            return set()
+
+        executable_name = Path(browser_path).name or "chrome.exe"
+        result = subprocess.run(
+            ["tasklist", "/fo", "csv", "/nh", "/fi", f"IMAGENAME eq {executable_name}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return set()
+
+        pids: set[int] = set()
+        for row in csv.reader(result.stdout.splitlines()):
+            if len(row) < 2 or row[0].startswith("INFO:"):
+                continue
+            try:
+                pids.add(int(row[1]))
+            except ValueError:
+                continue
+        return pids
+
+    def _center_browser_windows(self, browser_path: str, existing_pids: set[int]) -> None:
+        if sys.platform != "win32":
+            return
+
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.windll.user32
+            screen_width = user32.GetSystemMetrics(0)
+            screen_height = user32.GetSystemMetrics(1)
+            current_pids = self._list_browser_pids(browser_path)
+            target_pids = current_pids - existing_pids
+            if not target_pids:
+                target_pids = current_pids
+
+            def collect_windows() -> list[int]:
+                visible_windows: list[int] = []
+
+                @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+                def enum_windows(hwnd, _lparam):
+                    pid = wintypes.DWORD()
+                    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                    if pid.value not in target_pids:
+                        return True
+                    if not user32.IsWindow(hwnd):
+                        return True
+                    visible_windows.append(hwnd)
+                    return True
+
+                user32.EnumWindows(enum_windows, 0)
+                return visible_windows
+
+            windows: list[int] = []
+            for _ in range(16):
+                windows = collect_windows()
+                if windows:
+                    break
+                time.sleep(0.25)
+
+            for hwnd in windows:
+                user32.ShowWindow(hwnd, 5)
+                rect = wintypes.RECT()
+                if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+                    continue
+                width = max(1100, rect.right - rect.left)
+                height = max(780, rect.bottom - rect.top)
+                width = min(width, screen_width - 80)
+                height = min(height, screen_height - 120)
+                x = max(0, (screen_width - width) // 2)
+                y = max(0, (screen_height - height) // 2)
+                user32.MoveWindow(hwnd, x, y, width, height, True)
+                user32.SetForegroundWindow(hwnd)
+        except Exception:
+            logger.exception("Could not center login browser window.")
