@@ -1,4 +1,4 @@
-"""Simple in-app guide."""
+"""Huong dan su dung ngay trong ung dung."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QLabel, QPushButton, QScrollArea, QVBoxLayout, QWi
 
 
 class HelpTab(QWidget):
-    """Short guide and support information."""
+    """Tab huong dan ngan gon cho nguoi dung cuoi."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -26,58 +26,58 @@ class HelpTab(QWidget):
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(14)
 
-        hero = QLabel("Huong dan dung nhanh")
+        hero = QLabel("Hướng dẫn sử dụng nhanh")
         hero.setObjectName("heroNote")
         layout.addWidget(hero)
 
         cards = [
             (
-                "Mo phan mem",
-                "Chi can mo Tool Veo3's Thinh. Moi lan mo len app se tu kiem tra ban cap nhat moi.",
+                "1. Mở phần mềm",
+                "Chỉ cần mở Tool Veo3's Thinh. Mỗi lần mở lên, app sẽ tự kiểm tra phiên bản mới.",
             ),
             (
-                "Dang nhap 1 lan",
-                "Vao tab Tai khoan, bam mo trinh duyet dang nhap Flow roi dang nhap tai khoan cua ban. Tu lan sau app se nho phien nay.",
+                "2. Đăng nhập 1 lần",
+                "Vào tab Tài khoản, bấm mở trình duyệt đăng nhập Flow rồi đăng nhập tài khoản của bạn. Từ lần sau app sẽ nhớ phiên này.",
             ),
             (
-                "Neu may chua co Chrome",
-                "App se tu tai browser chinh thuc khi can. Ban khong can tu di tim browser de cai them.",
+                "3. Nếu máy chưa có Chrome",
+                "App có thể tự tải browser chính thức khi cần. Bạn không phải tự đi cài thêm Chrome.",
             ),
             (
-                "Tao video",
-                "Vao tab Video VEO3. Neu muon it loi nhat hay bam Preset an toan truoc, sau do nhap mo ta va bam Tao ngay bay gio.",
+                "4. Tạo video",
+                "Vào tab Video VEO3. Nếu muốn ổn định nhất, hãy bấm Preset an toàn trước, sau đó nhập mô tả và bấm Tạo ngay bây giờ👍.",
             ),
             (
-                "Tao anh",
-                "Vao tab Anh Flow. Neu muon on dinh nhat hay bam Preset an toan. Neu can bam theo bo cuc co san, hay them anh tham chieu.",
+                "5. Tạo ảnh",
+                "Vào tab Ảnh Flow. Nếu muốn ít lỗi nhất, hãy bấm Preset an toàn. Nếu cần bám theo bố cục sẵn có, hãy thêm ảnh tham chiếu.",
             ),
             (
-                "Tao hang loat",
-                "Bam Tao hang loat de nap nhieu prompt. Neu mot dong loi, ban co the sua prompt truc tiep va bam Tao lai ngay tren dong do.",
+                "6. Tạo hàng loạt",
+                "Bấm Tạo hàng loạt ⛓️ để nạp nhiều prompt. Nếu một dòng lỗi, bạn có thể sửa prompt trực tiếp rồi bấm Tạo lại ngay trên dòng đó.",
             ),
             (
-                "Kiem tra moi truong",
-                "Neu may moi cai hoac chay hay loi, vao menu Cong cu roi bam Kiem tra moi truong. App se tu kiem tra browser, thu muc va automation.",
+                "7. Kiểm tra môi trường",
+                "Nếu máy mới cài hoặc chạy hay lỗi, vào menu Công cụ rồi bấm Kiểm tra môi trường. App sẽ tự kiểm tra browser, thư mục và khả năng automation.",
             ),
             (
-                "Meo de chay on dinh",
-                "Video nen de song song thap de tranh Flow nghen. Anh co the de song song cao hon. Khi can nhanh nhat, uu tien 1080p.",
+                "8. Mẹo để chạy ổn định",
+                "Video nên để số tác vụ song song thấp để tránh Flow nghẽn. Ảnh có thể để song song cao hơn. Khi cần nhanh nhất, hãy ưu tiên 1080p.",
             ),
             (
-                "Khi thay loi",
-                "Neu app bao loi dang nhap hoac Flow khong phan hoi, hay dang nhap Flow lai trong tab Tai khoan roi thu lai.",
+                "9. Khi thấy lỗi",
+                "Nếu app báo lỗi đăng nhập hoặc Flow không phản hồi, hãy đăng nhập Flow lại trong tab Tài khoản rồi thử lại.",
             ),
         ]
 
         for title, body in cards:
             layout.addWidget(self._card(title, body))
 
-        support = QLabel("Lien he Zalo: 0932694714 neu can ho tro")
+        support = QLabel("🤙Liên hệ Zalo: 0932694714 nếu cần hỗ trợ")
         support.setAlignment(Qt.AlignmentFlag.AlignCenter)
         support.setObjectName("batchTitle")
         layout.addWidget(support)
 
-        zalo_btn = QPushButton("Mo Zalo ho tro")
+        zalo_btn = QPushButton("Mở Zalo hỗ trợ")
         zalo_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://zalo.me/0932694714")))
         layout.addWidget(zalo_btn, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addStretch(1)
