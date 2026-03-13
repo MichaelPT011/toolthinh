@@ -65,7 +65,7 @@ VIDEO_TOOL_URL = "https://labs.google/fx/tools/video-fx"
 IMAGE_TOOL_URL = "https://labs.google/fx/tools/image-fx"
 WHISK_TOOL_URL = "https://labs.google/fx/tools/whisk"
 FLOW_HOME_URL = "https://labs.google/fx/tools/flow"
-FLOW_LOGIN_URL = "https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Flabs.google%2Ffx%2Ftools%2Fflow"
+FLOW_LOGIN_URL = "https://labs.google/fx/vi/tools/flow"
 
 APP_TITLE = "🧠Tool Veo3 của Thịnh"
 

@@ -76,7 +76,9 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self._init_menu()
         self.statusBar().showMessage("Sẵn sàng")
-        QTimer.singleShot(1500, self._auto_check_updates)
+        # Disable in-app self-update. Replacing files while the frozen app is running
+        # can corrupt the onedir package and break the bundled interpreter.
+        # Updates should be applied before launch by a dedicated launcher flow.
 
     def _apply_theme(self) -> None:
         self.setStyleSheet(
@@ -300,7 +302,7 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Đã cập nhật cài đặt", 4000)
 
     def _auto_check_updates(self) -> None:
-        self._check_updates(manual=False)
+        return
 
     def _check_updates(self, manual: bool) -> None:
         if self._update_check_worker or self._update_prepare_worker:
