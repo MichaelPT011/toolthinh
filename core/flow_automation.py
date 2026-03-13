@@ -8,6 +8,7 @@ import logging
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from core.config import FLOW_HOME_URL
@@ -313,12 +314,22 @@ class FlowAutomation:
             download_button = page.get_by_role("button", name="Download")
             menu_items = page.locator('[role="menuitem"]')
 
+            await download_button.click()
+            await page.wait_for_timeout(400)
+            requested_item = menu_items.filter(has_text=quality_label).first
+            available_requested = await requested_item.count() > 0
+            if not available_requested and quality_label != "1K":
+                self._emit_status(
+                    status_callback,
+                    f"Flow hiện không có tùy chọn {quality_text} cho ảnh {index + 1}. App sẽ tự tải 1080p để tránh lỗi.",
+                )
+                quality_label = "1K"
+                quality_text = "1080P"
+                requested_item = menu_items.filter(has_text=quality_label).first
             if quality_label == "1K":
                 self._emit_status(status_callback, f"Đang tải ảnh {index + 1} ({quality_text})...")
                 async with page.expect_download(timeout=180000) as download_info:
-                    await download_button.click()
-                    await page.wait_for_timeout(400)
-                    await menu_items.filter(has_text=quality_label).first.click(force=True)
+                    await requested_item.click(force=True)
                 download = await download_info.value
                 await download.save_as(str(output_path))
                 return str(output_path)
@@ -327,9 +338,7 @@ class FlowAutomation:
             download = None
             try:
                 async with page.expect_download(timeout=90000) as download_info:
-                    await download_button.click()
-                    await page.wait_for_timeout(400)
-                    await menu_items.filter(has_text=quality_label).first.click(force=True)
+                    await requested_item.click(force=True)
                 download = await download_info.value
             except Exception:
                 download = None
@@ -339,22 +348,25 @@ class FlowAutomation:
                 self._emit_status(status_callback, f"Đã upscale xong ảnh {index + 1} lên {quality_text}.")
                 return str(output_path)
 
-            await self._wait_for_upscale_complete(
-                page,
-                quality_text,
-                timeout_seconds=900 if quality_label == "4K" else 420,
-                cancel_event=cancel_event,
-                status_callback=status_callback,
-            )
+            deadline = time.monotonic() + (900 if quality_label == "4K" else 420)
+            while time.monotonic() < deadline:
+                self._ensure_not_cancelled(cancel_event)
+                self._emit_status(status_callback, f"Đang chờ Flow hoàn tất upscale ảnh {index + 1} lên {quality_text}...")
+                await page.wait_for_timeout(12000)
+                try:
+                    async with page.expect_download(timeout=25000) as download_info:
+                        await download_button.click()
+                        await page.wait_for_timeout(400)
+                        await requested_item.click(force=True)
+                    download = await download_info.value
+                except Exception:
+                    download = None
+                if download is not None:
+                    await download.save_as(str(output_path))
+                    self._emit_status(status_callback, f"Đã upscale xong ảnh {index + 1} lên {quality_text}.")
+                    return str(output_path)
 
-            async with page.expect_download(timeout=180000) as download_info:
-                await download_button.click()
-                await page.wait_for_timeout(400)
-                await menu_items.filter(has_text=quality_label).first.click(force=True)
-            download = await download_info.value
-            await download.save_as(str(output_path))
-            self._emit_status(status_callback, f"Đã upscale xong ảnh {index + 1} lên {quality_text}.")
-            return str(output_path)
+            raise RuntimeError(f"Flow chưa hoàn tất upscale ảnh {quality_text}.")
 
     async def _upload_reference_image(self, page, image_path: str | None) -> None:
         if not image_path:

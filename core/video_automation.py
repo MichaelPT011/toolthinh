@@ -199,19 +199,19 @@ class VideoAutomation(FlowAutomation):
         return emit
 
     async def _configure_video_options(self, page, requested: int, aspect_ratio: str, mode: str) -> None:
-        await self._open_options_panel(page, minimum_tabs=8, error_message="Flow video options panel did not open correctly.")
+        tabs = await self._open_options_panel(page, minimum_tabs=8, error_message="Flow video options panel did not open correctly.")
 
-        await page.locator("button").filter(has_text="videocam").first.click(force=True)
+        await tabs.filter(has_text="videocam").first.click(force=True)
         await page.wait_for_timeout(600)
 
         if mode == "ingredients":
-            await page.locator("button").filter(has_text="chrome_extension").first.click(force=True)
+            await tabs.filter(has_text="chrome_extension").first.click(force=True)
         else:
-            await page.locator("button").filter(has_text="crop_free").first.click(force=True)
+            await tabs.filter(has_text="crop_free").first.click(force=True)
 
         orientation_label = "crop_16_9" if aspect_ratio == "16:9" else "crop_9_16"
-        await page.locator("button").filter(has_text=orientation_label).nth(1).click(force=True)
-        await page.locator("button").filter(has_text=f"x{requested}").last.click(force=True)
+        await tabs.filter(has_text=orientation_label).first.click(force=True)
+        await tabs.filter(has_text=f"x{requested}").first.click(force=True)
         await page.wait_for_timeout(500)
 
         model_dropdown = page.locator("button").filter(has_text="arrow_drop_down").last

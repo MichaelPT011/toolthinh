@@ -199,6 +199,9 @@ class AccountTab(QWidget):
                 f"Không mở được trình duyệt đăng nhập.\n\nChi tiết: {exc}",
             )
             return
+        if hasattr(self.auth, "ensure_browser_profile_account"):
+            self.auth.ensure_browser_profile_account()
+            self._refresh_table()
         self._refresh_browser_info()
         self.browser_info.setText(
             self.browser_info.text()

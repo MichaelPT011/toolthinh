@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.13.7",
+  "version": "2026.03.13.8",
   "channel": "stable",
   "name": "Tool Veo3's Thinh",
-  "notes": "Ban cap nhat moi cua Tool Veo3's Thinh.",
-  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.13.7/Tool-Veo3s-Thinh-win.zip",
-  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.13.7/Tool-Veo3s-Thinh-mac.zip"
+  "notes": "Sua batch, preset an toan va video automation cho cac mode chinh.",
+  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.13.8/Tool-Veo3s-Thinh-win.zip",
+  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.13.8/Tool-Veo3s-Thinh-mac.zip"
 }

@@ -111,7 +111,7 @@ class BrowserAssist:
                     FLOW_LOGIN_URL,
                 ]
             )
-            self._launch_browser(args)
+            self._launch_browser(args, center_window=True, browser_path=browser_path)
             return
         webbrowser.open(FLOW_LOGIN_URL)
 

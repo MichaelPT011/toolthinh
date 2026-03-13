@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -128,14 +129,12 @@ class FlowTab(QWidget):
         layout.addLayout(form)
 
         actions = QHBoxLayout()
-        self.safe_preset_btn = QPushButton("Preset an toàn")
+        self.safe_preset_btn = QCheckBox("Đang dùng preset an toàn")
         self.batch_btn = QPushButton("Tạo hàng loạt ⛓️")
         self.gen_btn = QPushButton("Tạo ngay bây giờ👍")
         self.stop_btn = QPushButton("Dừng")
         self.stop_btn.setEnabled(False)
-        self.safe_preset_btn.setCheckable(True)
         self.safe_preset_btn.setChecked(True)
-        self.safe_preset_btn.setText("Dung preset an toan")
         self.safe_preset_btn.toggled.connect(self._on_safe_preset_toggled)
         self.batch_btn.clicked.connect(self._toggle_batch)
         self.gen_btn.clicked.connect(self._generate)
@@ -193,11 +192,13 @@ class FlowTab(QWidget):
 
     def reload_accounts(self) -> None:
         current = self.account_combo.currentData()
+        if self.browser_assist and self.browser_assist.has_browser_profile_data() and not self.auth.get_active_accounts():
+            self.auth.ensure_browser_profile_account()
         self.account_combo.clear()
         for account in self.auth.get_active_accounts():
             self.account_combo.addItem(account.get("nickname", "Hồ sơ"), account["account_id"])
         if self.account_combo.count() == 0:
-            self.account_combo.addItem("Chua co tai khoan Flow/VEO3", None)
+            self.account_combo.addItem("Chưa đăng nhập Flow/VEO3", None)
         if current:
             index = self.account_combo.findData(current)
             if index >= 0:
@@ -239,26 +240,31 @@ class FlowTab(QWidget):
     def _on_safe_preset_toggled(self, checked: bool) -> None:
         if checked:
             self._apply_safe_preset(startup=True)
-            self.progress_label.setText("Dang dung preset an toan cho tab Anh.")
+            self.progress_label.setText("Đang dùng preset an toàn cho tab Ảnh.")
         self.num_images_spin.setEnabled(not checked)
         self.quality_combo.setEnabled(not checked)
         self.orientation_combo.setEnabled(not checked)
         self.batch_widget.mode_combo.setEnabled(not checked)
         self.batch_widget.concurrent_spin.setEnabled(not checked)
-        self.safe_preset_btn.setText("Dang dung preset an toan" if checked else "Dung preset an toan")
+        self.safe_preset_btn.setText("Đang dùng preset an toàn" if checked else "Dùng preset an toàn")
 
     def _generation_readiness_warning(self) -> str | None:
+        if self.browser_assist and self.browser_assist.has_browser_profile_data():
+            if not self.auth.get_active_accounts():
+                self.auth.ensure_browser_profile_account()
+                self.reload_accounts()
+            return None
         if not self.auth.get_active_accounts() or not self.account_combo.currentData():
             return (
-                "Ban chua them tai khoan Flow/VEO3.\n\n"
-                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
-                "dang nhap xong roi quay lai tao."
+                "Bạn chưa đăng nhập Flow/VEO3.\n\n"
+                "Hãy vào tab Tài khoản, bấm Mở trình duyệt đăng nhập Flow, "
+                "đăng nhập xong rồi quay lại tạo."
             )
         if self.browser_assist and not self.browser_assist.has_browser_profile_data():
             return (
-                "Ban chua dang nhap Flow/VEO3 trong browser cua app.\n\n"
-                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
-                "dang nhap xong roi quay lai tao."
+                "Bạn chưa đăng nhập Flow/VEO3 trong browser của app.\n\n"
+                "Hãy vào tab Tài khoản, bấm Mở trình duyệt đăng nhập Flow, "
+                "đăng nhập xong rồi quay lại tạo."
             )
         return None
 

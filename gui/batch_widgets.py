@@ -492,8 +492,17 @@ class BatchWidget(QFrame):
         if not self.prompts:
             QMessageBox.information(self, "Tạo hàng loạt", "Hãy thêm ít nhất một prompt.")
             return
-        if not self.auth.get_active_accounts():
-            QMessageBox.warning(self, "Tạo hàng loạt", "Hãy có ít nhất một hồ sơ đang hoạt động.")
+        try:
+            self.build_rows(
+                self.prompts,
+                {
+                    "sequence_files": list(self.sequence_files),
+                    "root_folder": self.root_folder,
+                },
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Tạo hàng loạt", str(exc))
+            self._rebuild_rows(preserve_state=False)
             return
         preflight_check = getattr(self.parent(), "_generation_readiness_warning", None)
         if callable(preflight_check):
@@ -501,6 +510,9 @@ class BatchWidget(QFrame):
             if message:
                 QMessageBox.warning(self, "Batch", message)
                 return
+        if not self.auth.get_active_accounts():
+            QMessageBox.warning(self, "Tạo hàng loạt", "Bạn chưa đăng nhập Flow/VEO3. Hãy mở trình duyệt đăng nhập Flow trước.")
+            return
         self._retry_rows(list(range(len(self.prompts))), reset_codes=True)
 
     def _retry_failed_rows(self) -> None:

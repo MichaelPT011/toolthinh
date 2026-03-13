@@ -51,6 +51,17 @@ class GoogleAuth:
         logger.info("Added profile %s", account["nickname"])
         return account
 
+    def ensure_browser_profile_account(self, nickname: str = "Flow mac dinh") -> dict:
+        marker = "__managed_browser_profile__"
+        for account in self._accounts:
+            if account.get("notes") == marker:
+                account["status"] = "active"
+                if not account.get("nickname"):
+                    account["nickname"] = nickname
+                self._save_accounts()
+                return account
+        return self.add_account(nickname=nickname, notes=marker)
+
     def import_account_from_file(self, file_path: str) -> dict:
         with open(file_path, "r", encoding="utf-8") as handle:
             raw = json.load(handle)

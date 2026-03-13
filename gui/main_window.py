@@ -197,6 +197,22 @@ class MainWindow(QMainWindow):
                 border-radius: 8px;
                 background: #16a34a;
             }
+            QCheckBox {
+                spacing: 8px;
+                font-weight: 600;
+                color: #111827;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 6px;
+                border: 1px solid #94a3b8;
+                background: #ffffff;
+            }
+            QCheckBox::indicator:checked {
+                border: 1px solid #16a34a;
+                background: #16a34a;
+            }
             QMenuBar {
                 background: #ffffff;
                 color: #111827;
