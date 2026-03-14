@@ -568,7 +568,7 @@ class BatchWidget(QFrame):
             settings.get("batch_interval", 2),
         )
         self._worker.row_update.connect(self._on_row_update)
-        self._worker.finished.connect(self._on_batch_finished)
+        self._worker.completed.connect(self._on_batch_finished)
         self._worker.error.connect(self._on_batch_error)
         self._worker.cancelled.connect(self._on_batch_cancelled)
         self._worker.start()

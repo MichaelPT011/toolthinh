@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import os
+import logging
 import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,6 +24,8 @@ from core.config import APP_TITLE, OUTPUT_DIR
 from core.environment_check import EnvironmentChecker
 from core.updater import UpdateManager
 from gui.base_worker import BaseWorker
+
+logger = logging.getLogger(__name__)
 
 
 class UpdateCheckWorker(BaseWorker):
@@ -99,14 +102,13 @@ class MainWindow(QMainWindow):
         self._environment_check_worker: EnvironmentCheckWorker | None = None
         self._startup_dialog: StartupWaitDialog | None = None
         self._update_started_from_startup = False
+        self._startup_quit_guard_active = False
         self.setWindowTitle(APP_TITLE)
         self.setMinimumSize(1280, 900)
         self._apply_theme()
         self._init_ui()
         self._init_menu()
         self.statusBar().showMessage("Sẵn sàng")
-        if os.environ.get("QT_QPA_PLATFORM", "").lower() != "offscreen":
-            QTimer.singleShot(0, self._auto_check_updates)
 
     def _apply_theme(self) -> None:
         self.setStyleSheet(
@@ -347,6 +349,11 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Da cap nhat cai dat", 4000)
 
     def _auto_check_updates(self) -> None:
+        logger.info("Startup auto-update check started")
+        app = QApplication.instance()
+        if app and not self._startup_quit_guard_active:
+            app.setQuitOnLastWindowClosed(False)
+            self._startup_quit_guard_active = True
         self._startup_dialog = StartupWaitDialog(self)
         self._startup_dialog.set_message("Vui long cho de kiem tra cap nhat...")
         self._startup_dialog.show()
@@ -356,20 +363,23 @@ class MainWindow(QMainWindow):
 
     def _check_updates(self) -> None:
         if self._update_check_worker or self._update_prepare_worker:
+            logger.info("Skip update check because worker already running")
             return
 
         from gui.settings_dialog import load_settings
 
         manager = UpdateManager(load_settings())
         self._update_started_from_startup = True
+        logger.info("Creating UpdateCheckWorker")
         self.statusBar().showMessage("Dang kiem tra cap nhat...", 4000)
         self._update_check_worker = UpdateCheckWorker(manager)
-        self._update_check_worker.finished.connect(self._on_update_checked)
+        self._update_check_worker.completed.connect(self._on_update_checked)
         self._update_check_worker.error.connect(self._on_update_check_error)
         self._update_check_worker.start()
 
     def _on_update_checked(self, result: object) -> None:
         self._update_check_worker = None
+        logger.info("Update check result: %r", result)
         if not isinstance(result, dict):
             self._close_startup_dialog()
             return
@@ -385,18 +395,20 @@ class MainWindow(QMainWindow):
         from gui.settings_dialog import load_settings
 
         manager = UpdateManager(load_settings())
+        logger.info("Preparing update for remote version %s", result.get("remote_version"))
         if self._startup_dialog:
             self._startup_dialog.set_message(
                 f"Dang tai va cai dat ban moi {result['remote_version']}...\nTool se tu mo lai sau khi xong."
             )
         self.statusBar().showMessage("Dang tai ban cap nhat moi...", 4000)
         self._update_prepare_worker = UpdatePrepareWorker(manager, result, os.getpid())
-        self._update_prepare_worker.finished.connect(self._on_update_prepared)
+        self._update_prepare_worker.completed.connect(self._on_update_prepared)
         self._update_prepare_worker.error.connect(self._on_update_check_error)
         self._update_prepare_worker.start()
 
     def _on_update_prepared(self, result: object) -> None:
         self._update_prepare_worker = None
+        logger.info("Update prepared: %r; quitting for apply", result)
         if self._startup_dialog:
             self._startup_dialog.set_message("Đang đóng app để cài bản cập nhật mới...")
         self.statusBar().showMessage("Đang cài bản cập nhật mới và tự mở lại...", 3000)
@@ -404,6 +416,7 @@ class MainWindow(QMainWindow):
 
     def _on_update_check_error(self, message: str) -> None:
         was_startup = self._update_started_from_startup
+        logger.exception("Update check error: %s", message)
         self._update_check_worker = None
         self._update_prepare_worker = None
         self.statusBar().showMessage("Không kiểm tra được cập nhật. App vẫn sẽ được mở bình thường.", 4000)
@@ -412,12 +425,19 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Cập nhật", message)
 
     def _close_startup_dialog(self) -> None:
+        logger.info("Closing startup dialog")
         self._update_started_from_startup = False
         if self._startup_dialog:
             self._startup_dialog.close()
             self._startup_dialog.deleteLater()
             self._startup_dialog = None
+        self.show()
         self.showNormal()
+        QApplication.processEvents()
+        app = QApplication.instance()
+        if app and self._startup_quit_guard_active:
+            app.setQuitOnLastWindowClosed(True)
+            self._startup_quit_guard_active = False
         if os.environ.get("QT_QPA_PLATFORM", "").lower() != "offscreen":
             self.raise_()
             self.activateWindow()
@@ -463,7 +483,7 @@ class MainWindow(QMainWindow):
         checker = EnvironmentChecker(load_settings(), browser_assist, self.auth)
         self.statusBar().showMessage("Đang kiểm tra môi trường...", 4000)
         self._environment_check_worker = EnvironmentCheckWorker(checker)
-        self._environment_check_worker.finished.connect(self._on_environment_checked)
+        self._environment_check_worker.completed.connect(self._on_environment_checked)
         self._environment_check_worker.error.connect(self._on_environment_check_error)
         self._environment_check_worker.start()
 

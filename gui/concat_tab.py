@@ -159,7 +159,7 @@ class ConcatTab(QWidget):
         )
         self.run_btn.setEnabled(False)
         self._worker = ConcatWorker(self.concat_engine, job)
-        self._worker.finished.connect(self._on_finished)
+        self._worker.completed.connect(self._on_finished)
         self._worker.error.connect(self._on_error)
         self._worker.start()
 

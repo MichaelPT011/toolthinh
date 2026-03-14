@@ -75,7 +75,7 @@ class ProxyDialog(QDialog):
             return
         self.status_label.setText("Đang kiểm tra proxy...")
         self._worker = ProxyTestWorker(proxy)
-        self._worker.finished.connect(self._on_test_ok)
+        self._worker.completed.connect(self._on_test_ok)
         self._worker.error.connect(self._on_test_error)
         self._worker.start()
 

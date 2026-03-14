@@ -37,11 +37,12 @@ def _version() -> str:
     return str(data.get("version") or "0.0.0")
 
 
-def _zip_dir(source_dir: Path, zip_path: Path) -> None:
+def _zip_dir(source_dir: Path, zip_path: Path, root_name: str | None = None) -> None:
     zip_path.parent.mkdir(parents=True, exist_ok=True)
+    archive_root = root_name or source_dir.name
     with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as archive:
         for path in source_dir.rglob("*"):
-            archive.write(path, path.relative_to(source_dir.parent))
+            archive.write(path, Path(archive_root) / path.relative_to(source_dir))
 
 
 def main() -> int:
@@ -85,15 +86,23 @@ def main() -> int:
 
     built_dir = DIST_DIR / BUILD_NAME
     app_dir = DIST_DIR / APP_NAME
+    final_dir = built_dir
     if app_dir.exists():
         shutil.rmtree(app_dir, ignore_errors=True)
-    built_dir.rename(app_dir)
-    built_exe = app_dir / f"{BUILD_NAME}.exe"
-    final_exe = app_dir / f"{APP_NAME}.exe"
+    try:
+        if built_dir.exists() and built_dir.is_dir() and not app_dir.exists():
+            built_dir.rename(app_dir)
+            final_dir = app_dir
+    except OSError:
+        final_dir = built_dir
+
+    built_exe = final_dir / f"{BUILD_NAME}.exe"
+    final_exe = final_dir / f"{APP_NAME}.exe"
     if built_exe.exists():
+        final_exe.unlink(missing_ok=True)
         built_exe.rename(final_exe)
     zip_path = RELEASE_DIR / ZIP_NAME
-    _zip_dir(app_dir, zip_path)
+    _zip_dir(final_dir, zip_path, APP_NAME)
     print(f"Built Windows release {zip_path} (version {_version()})")
     return 0
 

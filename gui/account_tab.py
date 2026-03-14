@@ -157,7 +157,7 @@ class AccountTab(QWidget):
         self._workers.clear()
         for account in self.auth.get_accounts():
             worker = ValidateWorker(self.auth, account["account_id"])
-            worker.finished.connect(lambda _result, self=self: self._refresh_table())
+            worker.completed.connect(lambda _result, self=self: self._refresh_table())
             worker.error.connect(lambda message, self=self: QMessageBox.warning(self, "Kiểm tra", message))
             worker.start()
             self._workers.append(worker)
@@ -188,7 +188,7 @@ class AccountTab(QWidget):
 
     def _validate_one(self, account_id: str) -> None:
         worker = ValidateWorker(self.auth, account_id)
-        worker.finished.connect(lambda _result, self=self: self._refresh_table())
+        worker.completed.connect(lambda _result, self=self: self._refresh_table())
         worker.error.connect(lambda message, self=self: QMessageBox.warning(self, "Kiểm tra", message))
         worker.start()
         self._workers.append(worker)

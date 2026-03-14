@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import os
 import sys
@@ -17,10 +18,19 @@ def _runtime_root() -> Path:
 
 os.chdir(_runtime_root())
 
+_log_dir = _runtime_root() / "data" / "logs"
+_log_dir.mkdir(parents=True, exist_ok=True)
+_log_file = _log_dir / "app.log"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    handlers=[
+        logging.FileHandler(_log_file, encoding="utf-8"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
+logger = logging.getLogger(__name__)
 
 
 def _handle_update_cli(argv: list[str]) -> int | None:
@@ -45,10 +55,68 @@ def _handle_update_cli(argv: list[str]) -> int | None:
     return 0
 
 
+def _run_startup_update_check(app, settings: dict) -> int | None:
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout
+
+    from core.updater import UpdateManager
+
+    class StartupUpdateDialog(QDialog):
+        def __init__(self) -> None:
+            super().__init__(None)
+            self.setWindowTitle("Khởi động")
+            self.setModal(True)
+            self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
+            self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
+            self.setMinimumWidth(420)
+            layout = QVBoxLayout(self)
+            layout.setContentsMargins(24, 24, 24, 24)
+            self.label = QLabel("Vui lòng chờ để kiểm tra cập nhật...")
+            self.label.setWordWrap(True)
+            layout.addWidget(self.label)
+
+        def set_message(self, text: str) -> None:
+            self.label.setText(text)
+
+    dialog = None
+    if os.environ.get("QT_QPA_PLATFORM", "").lower() != "offscreen":
+        dialog = StartupUpdateDialog()
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+        app.processEvents()
+
+    manager = UpdateManager(settings)
+    try:
+        info = asyncio.run(manager.check_for_update())
+        logger.info("Startup update info: %r", info)
+        if info.get("has_update"):
+            if dialog:
+                dialog.set_message(
+                    f"Đang tải và cài đặt bản mới {info['remote_version']}...\n"
+                    "Tool sẽ tự mở lại sau khi xong."
+                )
+                app.processEvents()
+            zip_path = asyncio.run(manager.download_package(info))
+            manager.spawn_apply_update(zip_path, os.getpid())
+            logger.info("Startup update prepared; exiting for apply")
+            return 0
+    except Exception as exc:
+        logger.exception("Startup update check failed: %s", exc)
+    finally:
+        if dialog:
+            dialog.close()
+            dialog.deleteLater()
+            app.processEvents()
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(argv if argv is not None else sys.argv[1:])
+    logger.info("App start argv=%s frozen=%s root=%s", argv, getattr(sys, "frozen", False), _runtime_root())
     handled = _handle_update_cli(argv)
     if handled is not None:
+        logger.info("Handled apply-update CLI and exiting rc=%s", handled)
         return handled
 
     from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPalette
@@ -70,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ensure_dirs()
     settings = load_settings()
+    logger.info("Loaded settings: %s", settings)
     output_base = Path(settings["output_dir"]).resolve()
     (output_base / "videos").mkdir(parents=True, exist_ok=True)
     (output_base / "images").mkdir(parents=True, exist_ok=True)
@@ -99,6 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     batch = BatchEngine()
 
     app = QApplication(sys.argv)
+    app.aboutToQuit.connect(lambda: logger.info("QApplication.aboutToQuit emitted"))
     app.setStyle("Fusion")
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor("#f3f4f6"))
@@ -132,11 +202,19 @@ def main(argv: list[str] | None = None) -> int:
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 
+    handled = _run_startup_update_check(app, settings)
+    if handled is not None:
+        logger.info("Handled startup update flow; exiting rc=%s", handled)
+        return handled
+
     window = MainWindow(auth, api_client, video_gen, flow_gen, concat, project_mgr, batch)
+    logger.info("MainWindow created; showing UI")
     if icon_path.exists():
         window.setWindowIcon(QIcon(str(icon_path)))
     window.show()
-    return app.exec()
+    rc = app.exec()
+    logger.info("App event loop exited rc=%s", rc)
+    return rc
 
 
 if __name__ == "__main__":

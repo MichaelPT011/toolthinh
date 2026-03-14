@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class BaseWorker(QThread):
     """Run an async coroutine inside a dedicated Qt worker thread."""
 
-    finished = Signal(object)
+    completed = Signal(object)
     error = Signal(str)
     progress = Signal(int)
     status = Signal(str)
@@ -25,6 +25,7 @@ class BaseWorker(QThread):
         self._loop = None
         self._task = None
         self.cancel_event = None
+        self.finished.connect(self.deleteLater)
 
     @abstractmethod
     async def _run_async(self):
@@ -38,7 +39,7 @@ class BaseWorker(QThread):
         try:
             self._task = loop.create_task(self._run_async())
             result = loop.run_until_complete(self._task)
-            self.finished.emit(result)
+            self.completed.emit(result)
         except asyncio.CancelledError:
             self.cancelled.emit("Đã dừng tác vụ.")
         except Exception as exc:

@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.14.5",
+  "version": "2026.03.14.6",
   "channel": "stable",
   "name": "Tool Veo3's Thinh",
-  "notes": "Ban cap nhat moi cua Tool Veo3's Thinh.",
-  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.5/Tool-Veo3s-Thinh-win.zip",
-  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.5/Tool-Veo3s-Thinh-mac.zip"
+  "notes": "Sua loi ban EXE bi tat ngay sau khi kiem tra cap nhat luc khoi dong va on dinh hoa worker startup.",
+  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.6/Tool-Veo3s-Thinh-win.zip",
+  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.6/Tool-Veo3s-Thinh-mac.zip"
 }
