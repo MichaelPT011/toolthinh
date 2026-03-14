@@ -52,6 +52,7 @@ DEFAULT_SETTINGS = {
     "output_dir": str(OUTPUT_DIR),
     "downloads_dir": str(DEFAULT_DOWNLOADS_DIR),
     "browser_path": "",
+    "prefer_managed_browser": True,
     "chrome_user_data_dir": str(MANAGED_CHROME_DATA_DIR),
     "chrome_profile_dir": "Default",
     "headless_automation": False,

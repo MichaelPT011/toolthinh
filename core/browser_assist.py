@@ -95,6 +95,7 @@ class BrowserAssist:
         profile_dir = self._effective_profile_dir()
         if browser_path:
             self._close_existing_managed_browser(browser_path, user_data_dir)
+            self._prepare_login_profile(user_data_dir, profile_dir)
             args = [browser_path]
             if user_data_dir:
                 args.append(f"--user-data-dir={user_data_dir}")
@@ -106,13 +107,18 @@ class BrowserAssist:
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-session-crashed-bubble",
+                    "--disable-extensions",
+                    "--disable-background-mode",
+                    "--disable-sync",
+                    "--disable-component-update",
+                    "--disable-default-apps",
                     "--new-window",
                     "--window-size=1280,900",
                     "--window-position=120,80",
                     FLOW_LOGIN_URL,
                 ]
             )
-            self._launch_browser(args, center_window=True, browser_path=browser_path)
+            self._launch_browser(args)
             return
         webbrowser.open(FLOW_LOGIN_URL)
 
@@ -268,12 +274,31 @@ class BrowserAssist:
 
     def _resolve_browser_path(self, allow_install: bool = False) -> str | None:
         configured = self.settings.get("browser_path", "").strip()
-        if configured and Path(configured).exists():
-            return configured
+        prefer_managed = bool(self.settings.get("prefer_managed_browser", True))
 
         managed = self.browser_installer.installed_browser_path()
         if managed:
             return managed
+
+        bundled_candidates = [
+            BUNDLED_CHROME_DIR / "chrome.exe",
+            BUNDLED_CHROME_NESTED_DIR / "chrome.exe",
+        ]
+        for candidate in bundled_candidates:
+            if candidate.exists():
+                return str(candidate)
+
+        if allow_install and self.browser_installer.can_auto_install():
+            try:
+                return self.browser_installer.ensure_browser()
+            except BrowserInstallError as exc:
+                logger.error("Auto-install browser failed: %s", exc)
+
+        if configured and Path(configured).exists():
+            return configured
+
+        if prefer_managed:
+            return None
 
         candidates = [
             Path.home() / "AppData/Local/Google/Chrome/Application/chrome.exe",
@@ -283,8 +308,6 @@ class BrowserAssist:
             Path.home() / "Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
             Path("/usr/bin/google-chrome"),
             Path("/usr/bin/google-chrome-stable"),
-            BUNDLED_CHROME_DIR / "chrome.exe",
-            BUNDLED_CHROME_NESTED_DIR / "chrome.exe",
         ]
         for candidate in candidates:
             if candidate.exists():
@@ -292,14 +315,11 @@ class BrowserAssist:
         found = shutil.which("chrome") or shutil.which("chrome.exe")
         if found:
             return found
-        if allow_install and self.browser_installer.can_auto_install():
-            try:
-                return self.browser_installer.ensure_browser()
-            except BrowserInstallError as exc:
-                logger.error("Auto-install browser failed: %s", exc)
         return None
 
     def _effective_user_data_dir(self) -> str:
+        if bool(self.settings.get("prefer_managed_browser", True)):
+            return str(MANAGED_BUNDLED_CHROME_DATA_DIR)
         configured = self.settings.get("chrome_user_data_dir", "").strip()
         if configured:
             return configured
@@ -317,6 +337,34 @@ class BrowserAssist:
     def _effective_profile_dir(self) -> str:
         configured = self.settings.get("chrome_profile_dir", "").strip()
         return configured or "Default"
+
+    def _prepare_login_profile(self, user_data_dir: str, profile_dir: str) -> None:
+        root = Path(user_data_dir).expanduser()
+        profile = root / profile_dir
+        profile.mkdir(parents=True, exist_ok=True)
+
+        # Remove stale Chrome lock files after managed processes are closed.
+        for name in ["SingletonLock", "SingletonCookie", "SingletonSocket", "lockfile"]:
+            try:
+                (root / name).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        # Prevent Chrome from restoring old automation tabs/sessions in the login window.
+        for name in ["Current Session", "Current Tabs", "Last Session", "Last Tabs"]:
+            try:
+                (profile / name).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        sessions_dir = profile / "Sessions"
+        if sessions_dir.exists():
+            for item in sessions_dir.iterdir():
+                if item.name.startswith(("Session_", "Tabs_")):
+                    try:
+                        item.unlink(missing_ok=True)
+                    except OSError:
+                        pass
 
     def _close_existing_managed_browser(self, browser_path: str, user_data_dir: str) -> None:
         if sys.platform != "win32":

@@ -66,11 +66,11 @@ class SettingsDialog(QDialog):
         downloads_widget = self._browse_row(self.downloads_edit, self._browse_downloads)
 
         self.browser_edit = QLineEdit(self._settings.get("browser_path", ""))
-        self.browser_edit.setPlaceholderText("Để trống để app tự dùng browser đi kèm hoặc Chrome hệ thống")
+        self.browser_edit.setPlaceholderText("Để trống để app tự dùng browser riêng của tool")
         browser_widget = self._browse_row(self.browser_edit, self._browse_browser_file)
 
         self.user_data_edit = QLineEdit(self._settings.get("chrome_user_data_dir", ""))
-        self.user_data_edit.setPlaceholderText("Mặc định dùng hồ sơ sạch riêng của app")
+        self.user_data_edit.setPlaceholderText("Mặc định dùng hồ sơ riêng, tách biệt khỏi Chrome hệ thống")
         user_data_widget = self._browse_row(self.user_data_edit, self._browse_user_data_dir)
 
         self.profile_edit = QLineEdit(self._settings.get("chrome_profile_dir", "Default"))
@@ -161,6 +161,7 @@ class SettingsDialog(QDialog):
             "output_dir": self.output_edit.text().strip() or str(OUTPUT_DIR),
             "downloads_dir": self.downloads_edit.text().strip() or str(Path.home() / "Downloads"),
             "browser_path": self.browser_edit.text().strip(),
+            "prefer_managed_browser": True,
             "chrome_user_data_dir": self.user_data_edit.text().strip(),
             "chrome_profile_dir": self.profile_edit.text().strip() or "Default",
             "show_browser_window": self.show_browser_checkbox.isChecked(),

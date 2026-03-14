@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.14.4",
+  "version": "2026.03.14.5",
   "channel": "stable",
   "name": "Tool Veo3's Thinh",
-  "notes": "Ban cap nhat moi cua Tool Veo3's Thinh.",
-  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.4/Tool-Veo3s-Thinh-win.zip",
-  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.4/Tool-Veo3s-Thinh-mac.zip"
+  "notes": "Chuyen login/browser cua tool sang Chrome rieng biet va profile rieng, khong con bam vao Chrome he thong.",
+  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.5/Tool-Veo3s-Thinh-win.zip",
+  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.5/Tool-Veo3s-Thinh-mac.zip"
 }
