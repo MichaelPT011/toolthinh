@@ -2,7 +2,7 @@
   "version": "2026.03.14.7",
   "channel": "stable",
   "name": "Tool Veo3's Thinh",
-  "notes": "Sua loi nut Mo trinh duyet dang nhap Flow tren ban EXE, tach mo browser sang worker nen khong con treo tool.",
+  "notes": "Ban cap nhat moi cua Tool Veo3's Thinh.",
   "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.7/Tool-Veo3s-Thinh-win.zip",
   "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.7/Tool-Veo3s-Thinh-mac.zip"
 }
