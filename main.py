@@ -128,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("App start argv=%s frozen=%s root=%s", argv, getattr(sys, "frozen", False), _runtime_root())
     handled = _handle_update_cli(argv)
     if handled is not None:
-        logger.info("Handled apply-update CLI and exiting rc=%s", handled)
+        logger.info("Handled startup CLI and exiting rc=%s", handled)
         return handled
 
     from PySide6.QtGui import QColor, QFont, QFontDatabase, QIcon, QPalette
