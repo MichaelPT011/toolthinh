@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.14.3",
+  "version": "2026.03.14.4",
   "channel": "stable",
   "name": "Tool Veo3's Thinh",
-  "notes": "Ban cap nhat moi cua Tool Veo3's Thinh.",
-  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.3/Tool-Veo3s-Thinh-win.zip",
-  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.3/Tool-Veo3s-Thinh-mac.zip"
+  "notes": "Sua auto-update trong ban EXE de doc dung version hien tai va khong tu dong dong app oan.",
+  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.4/Tool-Veo3s-Thinh-win.zip",
+  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.4/Tool-Veo3s-Thinh-mac.zip"
 }

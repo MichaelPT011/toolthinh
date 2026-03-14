@@ -37,13 +37,15 @@ class UpdateManager:
         self.settings = dict(settings)
 
     def current_version(self) -> str:
-        if not VERSION_FILE.exists():
-            return "0.0.0"
-        try:
-            data = json.loads(VERSION_FILE.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return "0.0.0"
-        return str(data.get("version") or "0.0.0")
+        for candidate in self._version_file_candidates():
+            if not candidate.exists():
+                continue
+            try:
+                data = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            return str(data.get("version") or "0.0.0")
+        return "0.0.0"
 
     async def check_for_update(self) -> dict:
         manifest_url = OFFICIAL_UPDATE_MANIFEST_URL
@@ -244,6 +246,16 @@ class UpdateManager:
         if current:
             parts.append(int(current))
         return tuple(parts or [0])
+
+    def _version_file_candidates(self) -> list[Path]:
+        candidates: list[Path] = [VERSION_FILE]
+        if getattr(sys, "frozen", False):
+            exe_root = Path(sys.executable).resolve().parent
+            candidates.append(exe_root / "_internal" / "version.json")
+            meipass = getattr(sys, "_MEIPASS", "")
+            if meipass:
+                candidates.append(Path(meipass) / "version.json")
+        return candidates
 
 
 def apply_update(zip_path: Path, target_dir: Path, restart_path: Path, pid: int) -> None:
