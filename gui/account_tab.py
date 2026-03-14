@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QDialog,
@@ -35,19 +33,6 @@ class ValidateWorker(BaseWorker):
 
     async def _run_async(self):
         return await self.auth.validate_session(self.account_id)
-
-
-class LaunchLoginWorker(BaseWorker):
-    """Open the login browser without blocking the UI thread."""
-
-    def __init__(self, browser_assist) -> None:
-        super().__init__()
-        self.browser_assist = browser_assist
-
-    async def _run_async(self):
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.browser_assist.launch_login_browser)
-        return {"opened": True}
 
 
 class AddProfileDialog(QDialog):
@@ -107,7 +92,6 @@ class AccountTab(QWidget):
         self.auth = auth
         self.browser_assist = browser_assist
         self._workers: list[ValidateWorker] = []
-        self._login_worker: LaunchLoginWorker | None = None
         self._identity_timer = QTimer(self)
         self._identity_timer.setInterval(3000)
         self._identity_timer.timeout.connect(self._poll_browser_identity)
@@ -213,40 +197,30 @@ class AccountTab(QWidget):
         if not self.browser_assist:
             QMessageBox.warning(self, "Trình duyệt", "Chưa cấu hình trình duyệt.")
             return
-        if self._login_worker:
-            return
-
         self.login_btn.setEnabled(False)
         self.browser_info.setText(
-            self.browser_info.text() + "\n\nĐang chuẩn bị trình duyệt đăng nhập Flow..."
+            self.browser_info.text()
+            + "\n\nDang chuan bi trinh duyet dang nhap Flow..."
+            + "\nLan dau co the mat 1-3 phut de tai trinh duyet rieng cua tool."
         )
-        worker = LaunchLoginWorker(self.browser_assist)
-        worker.completed.connect(self._on_login_browser_opened)
-        worker.error.connect(self._on_login_browser_error)
-        worker.cancelled.connect(self._on_login_browser_error)
-        worker.start()
-        self._login_worker = worker
+        try:
+            self.browser_assist.spawn_login_browser_helper()
+        except Exception as exc:
+            self.login_btn.setEnabled(True)
+            QMessageBox.critical(
+                self,
+                "Dang nhap Flow",
+                f"Khong mo duoc trinh duyet dang nhap.\n\nChi tiet: {exc}",
+            )
+            return
 
-    def _on_login_browser_opened(self, _result: object) -> None:
-        self._login_worker = None
-        self.login_btn.setEnabled(True)
-        self._sync_browser_identity()
-        self._refresh_table()
-        self._refresh_browser_info()
+        QTimer.singleShot(3000, lambda: self.login_btn.setEnabled(True))
         self._identity_timer_loops_left = 40
         self._identity_timer.start()
         self.browser_info.setText(
             self.browser_info.text()
-            + "\n\nĐã mở cửa sổ đăng nhập Flow. Sau khi đăng nhập xong, app sẽ tự đọc email và cập nhật bảng hồ sơ."
-        )
-
-    def _on_login_browser_error(self, message: str) -> None:
-        self._login_worker = None
-        self.login_btn.setEnabled(True)
-        QMessageBox.critical(
-            self,
-            "Đăng nhập Flow",
-            f"Không mở được trình duyệt đăng nhập.\n\nChi tiết: {message}",
+            + "\n\nDa gui lenh mo cua so dang nhap Flow."
+            + "\nSau khi dang nhap xong, app se tu doc email va cap nhat bang ho so."
         )
 
     def _refresh_browser_info(self) -> None:

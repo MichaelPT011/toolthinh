@@ -37,6 +37,7 @@ def _handle_update_cli(argv: list[str]) -> int | None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--apply-update", action="store_true")
     parser.add_argument("--smoke-login-browser", action="store_true")
+    parser.add_argument("--open-login-browser", action="store_true")
     parser.add_argument("--pid", type=int, default=0)
     parser.add_argument("--zip", dest="zip_path", default="")
     parser.add_argument("--target", dest="target_dir", default="")
@@ -53,7 +54,7 @@ def _handle_update_cli(argv: list[str]) -> int | None:
         )
         return 0
 
-    if args.smoke_login_browser:
+    if args.smoke_login_browser or args.open_login_browser:
         from core.browser_assist import BrowserAssist
         from core.config import ensure_dirs
         from gui.settings_dialog import load_settings

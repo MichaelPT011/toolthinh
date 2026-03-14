@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 class BrowserAssist:
     """Open official Labs pages in Chrome and auto-import downloaded files."""
 
+    LOGIN_LAUNCH_MARKER = "login-launch-v2"
+
     TOOL_URLS = {
         "video": FLOW_HOME_URL,
         "flow": FLOW_HOME_URL,
@@ -96,7 +98,8 @@ class BrowserAssist:
         user_data_dir = self._effective_user_data_dir()
         profile_dir = self._effective_profile_dir()
         logger.info(
-            "launch_login_browser start browser=%s user_data_dir=%s profile_dir=%s",
+            "launch_login_browser %s start browser=%s user_data_dir=%s profile_dir=%s",
+            self.LOGIN_LAUNCH_MARKER,
             browser_path,
             user_data_dir,
             profile_dir,
@@ -126,11 +129,38 @@ class BrowserAssist:
                     FLOW_LOGIN_URL,
                 ]
             )
-            self._launch_browser(args, center_window=True, browser_path=browser_path)
-            logger.info("launch_login_browser opened managed browser")
+            self._launch_browser(args, center_window=False, browser_path=browser_path)
+            logger.info("launch_login_browser %s opened managed browser", self.LOGIN_LAUNCH_MARKER)
             return
-        logger.info("launch_login_browser fallback webbrowser.open")
+        logger.info("launch_login_browser %s fallback webbrowser.open", self.LOGIN_LAUNCH_MARKER)
         webbrowser.open(FLOW_LOGIN_URL)
+
+    def spawn_login_browser_helper(self) -> None:
+        """Launch the login browser in a detached helper process."""
+        if getattr(sys, "frozen", False):
+            command = [str(Path(sys.executable).resolve()), "--open-login-browser"]
+            workdir = str(Path(sys.executable).resolve().parent)
+        else:
+            main_path = Path(__file__).resolve().parent.parent / "main.py"
+            command = [sys.executable, str(main_path), "--open-login-browser"]
+            workdir = str(main_path.parent)
+
+        popen_kwargs: dict[str, object] = {
+            "cwd": workdir,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if sys.platform == "win32":
+            popen_kwargs["creationflags"] = (
+                subprocess.CREATE_NEW_PROCESS_GROUP
+                | subprocess.DETACHED_PROCESS
+                | subprocess.CREATE_NO_WINDOW
+            )
+        else:
+            popen_kwargs["start_new_session"] = True
+
+        logger.info("Spawning detached login browser helper: %s", command)
+        subprocess.Popen(command, **popen_kwargs)
 
     def describe_environment(self) -> dict:
         identity = self.read_profile_identity()
@@ -288,7 +318,17 @@ class BrowserAssist:
 
         managed = self.browser_installer.installed_browser_path()
         if managed:
+            logger.info("Resolved browser path from managed install: %s", managed)
             return managed
+
+        if allow_install and self.browser_installer.can_auto_install():
+            try:
+                logger.info("Attempting managed browser install for login/browser flow")
+                ensured = self.browser_installer.ensure_browser()
+                logger.info("Resolved browser path from managed install after ensure: %s", ensured)
+                return ensured
+            except BrowserInstallError as exc:
+                logger.error("Auto-install browser failed: %s", exc)
 
         bundled_candidates = [
             BUNDLED_CHROME_DIR / "chrome.exe",
@@ -298,15 +338,11 @@ class BrowserAssist:
         ]
         for candidate in bundled_candidates:
             if candidate.exists():
+                logger.info("Resolved browser path from bundled candidate: %s", candidate)
                 return str(candidate)
 
-        if allow_install and self.browser_installer.can_auto_install():
-            try:
-                return self.browser_installer.ensure_browser()
-            except BrowserInstallError as exc:
-                logger.error("Auto-install browser failed: %s", exc)
-
         if configured and Path(configured).exists():
+            logger.info("Resolved browser path from configured path: %s", configured)
             return configured
 
         if prefer_managed:
@@ -323,9 +359,11 @@ class BrowserAssist:
         ]
         for candidate in candidates:
             if candidate.exists():
+                logger.info("Resolved browser path from system candidate: %s", candidate)
                 return str(candidate)
         found = shutil.which("chrome") or shutil.which("chrome.exe")
         if found:
+            logger.info("Resolved browser path from PATH lookup: %s", found)
             return found
         return None
 
