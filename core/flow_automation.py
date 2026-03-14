@@ -318,6 +318,7 @@ class FlowAutomation:
         async with runtime.download_slot():
             self._ensure_not_cancelled(cancel_event)
             output_path = self._reserve_output_path(output_dir / f"{index + 1}-{prefix}.png")
+            download_baseline = self.browser_assist.current_download_snapshot(extensions)
             download_button = page.get_by_role("button", name="Download")
             menu_items = page.locator('[role="menuitem"]')
 
@@ -335,11 +336,22 @@ class FlowAutomation:
                 requested_item = menu_items.filter(has_text=quality_label).first
             if quality_label == "1K":
                 self._emit_status(status_callback, f"Đang tải ảnh {index + 1} ({quality_text})...")
-                async with page.expect_download(timeout=180000) as download_info:
-                    await requested_item.click(force=True)
-                download = await download_info.value
-                await download.save_as(str(output_path))
-                return str(output_path)
+                try:
+                    async with page.expect_download(timeout=180000) as download_info:
+                        await requested_item.click(force=True)
+                    download = await download_info.value
+                    await download.save_as(str(output_path))
+                    return str(output_path)
+                except Exception:
+                    external_file = await self._wait_for_external_download(
+                        extensions,
+                        download_baseline,
+                        timeout_seconds=45,
+                    )
+                    if external_file:
+                        shutil.copy2(external_file, output_path)
+                        return str(output_path)
+                    raise
 
             self._emit_status(status_callback, f"Đang upscale ảnh {index + 1} lên {quality_text}...")
             download = None
@@ -355,11 +367,30 @@ class FlowAutomation:
                 self._emit_status(status_callback, f"Đã upscale xong ảnh {index + 1} lên {quality_text}.")
                 return str(output_path)
 
+            external_file = await self._wait_for_external_download(
+                extensions,
+                download_baseline,
+                timeout_seconds=20,
+            )
+            if external_file:
+                shutil.copy2(external_file, output_path)
+                self._emit_status(status_callback, f"Da tai xong anh {index + 1} ({quality_text}) qua theo doi file.")
+                return str(output_path)
+
             deadline = time.monotonic() + (900 if quality_label == "4K" else 420)
             while time.monotonic() < deadline:
                 self._ensure_not_cancelled(cancel_event)
                 self._emit_status(status_callback, f"Đang chờ Flow hoàn tất upscale ảnh {index + 1} lên {quality_text}...")
                 await page.wait_for_timeout(12000)
+                external_file = await self._wait_for_external_download(
+                    extensions,
+                    download_baseline,
+                    timeout_seconds=8,
+                )
+                if external_file:
+                    shutil.copy2(external_file, output_path)
+                    self._emit_status(status_callback, f"Da tai xong anh {index + 1} ({quality_text}) qua theo doi file.")
+                    return str(output_path)
                 try:
                     async with page.expect_download(timeout=25000) as download_info:
                         await download_button.click()
@@ -413,6 +444,23 @@ class FlowAutomation:
             candidate = path.with_name(f"{path.stem}_{counter}{path.suffix}")
             counter += 1
         return candidate
+
+    async def _wait_for_external_download(
+        self,
+        extensions: set[str],
+        baseline: set[Path],
+        *,
+        timeout_seconds: int,
+    ) -> Path | None:
+        downloads = await self.browser_assist.wait_for_downloads(
+            extensions,
+            timeout_seconds,
+            expected_count=1,
+            baseline=baseline,
+        )
+        if not downloads:
+            return None
+        return downloads[0]
 
     async def _wait_for_upscale_complete(
         self,

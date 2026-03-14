@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -96,6 +97,11 @@ class AccountTab(QWidget):
         self._identity_timer.setInterval(3000)
         self._identity_timer.timeout.connect(self._poll_browser_identity)
         self._identity_timer_loops_left = 0
+        self._login_helper_timer = QTimer(self)
+        self._login_helper_timer.setInterval(1000)
+        self._login_helper_timer.timeout.connect(self._poll_login_helper)
+        self._login_helper_process = None
+        self._login_wait_dialog: QProgressDialog | None = None
         self._init_ui()
         self._refresh_table()
 
@@ -197,14 +203,23 @@ class AccountTab(QWidget):
         if not self.browser_assist:
             QMessageBox.warning(self, "Trình duyệt", "Chưa cấu hình trình duyệt.")
             return
+        if self._login_helper_process is not None:
+            QMessageBox.information(
+                self,
+                "Đăng nhập Flow",
+                "Tool đang chuẩn bị trình duyệt đăng nhập. Vui lòng chờ thêm một chút.",
+            )
+            return
+
         self.login_btn.setEnabled(False)
+        needs_browser_setup = self.browser_assist.browser_installer.installed_browser_path() is None
         self.browser_info.setText(
             self.browser_info.text()
             + "\n\nDang chuan bi trinh duyet dang nhap Flow..."
             + "\nLan dau co the mat 1-3 phut de tai trinh duyet rieng cua tool."
         )
         try:
-            self.browser_assist.spawn_login_browser_helper()
+            self._login_helper_process = self.browser_assist.spawn_login_browser_helper()
         except Exception as exc:
             self.login_btn.setEnabled(True)
             QMessageBox.critical(
@@ -214,7 +229,10 @@ class AccountTab(QWidget):
             )
             return
 
-        QTimer.singleShot(3000, lambda: self.login_btn.setEnabled(True))
+        if needs_browser_setup:
+            self._show_login_wait_dialog()
+
+        self._login_helper_timer.start()
         self._identity_timer_loops_left = 40
         self._identity_timer.start()
         self.browser_info.setText(
@@ -222,6 +240,59 @@ class AccountTab(QWidget):
             + "\n\nDa gui lenh mo cua so dang nhap Flow."
             + "\nSau khi dang nhap xong, app se tu doc email va cap nhat bang ho so."
         )
+
+    def _show_login_wait_dialog(self) -> None:
+        dialog = QProgressDialog(self)
+        dialog.setWindowTitle("Thiet lap Chrome")
+        dialog.setLabelText(
+            "Vui long cho 1-3 phut de he thong thiet lap Chrome rieng cho tool.\n"
+            "Qua trinh nay chi xay ra o lan dau."
+        )
+        dialog.setCancelButton(None)
+        dialog.setRange(0, 0)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.setModal(True)
+        dialog.show()
+        self._login_wait_dialog = dialog
+
+    def _close_login_wait_dialog(self) -> None:
+        if not self._login_wait_dialog:
+            return
+        self._login_wait_dialog.close()
+        self._login_wait_dialog.deleteLater()
+        self._login_wait_dialog = None
+
+    def _poll_login_helper(self) -> None:
+        process = self._login_helper_process
+        if process is None:
+            self._login_helper_timer.stop()
+            self.login_btn.setEnabled(True)
+            self._close_login_wait_dialog()
+            return
+
+        if process.poll() is None:
+            return
+
+        exit_code = process.poll()
+        self._login_helper_process = None
+        self._login_helper_timer.stop()
+        self.login_btn.setEnabled(True)
+        self._close_login_wait_dialog()
+
+        if exit_code not in (0, None):
+            QMessageBox.warning(
+                self,
+                "Đăng nhập Flow",
+                "Trinh duyet dang nhap khong mo duoc dung cach. "
+                "Hay thu lai mot lan nua.",
+            )
+            return
+
+        self._sync_browser_identity()
+        self._refresh_table()
+        self._refresh_browser_info()
 
     def _refresh_browser_info(self) -> None:
         if not self.browser_assist:

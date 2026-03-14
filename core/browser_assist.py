@@ -135,7 +135,7 @@ class BrowserAssist:
         logger.info("launch_login_browser %s fallback webbrowser.open", self.LOGIN_LAUNCH_MARKER)
         webbrowser.open(FLOW_LOGIN_URL)
 
-    def spawn_login_browser_helper(self) -> None:
+    def spawn_login_browser_helper(self):
         """Launch the login browser in a detached helper process."""
         if getattr(sys, "frozen", False):
             command = [str(Path(sys.executable).resolve()), "--open-login-browser"]
@@ -160,7 +160,7 @@ class BrowserAssist:
             popen_kwargs["start_new_session"] = True
 
         logger.info("Spawning detached login browser helper: %s", command)
-        subprocess.Popen(command, **popen_kwargs)
+        return subprocess.Popen(command, **popen_kwargs)
 
     def describe_environment(self) -> dict:
         identity = self.read_profile_identity()
