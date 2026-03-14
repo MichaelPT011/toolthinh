@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.14.1",
+  "version": "2026.03.14.2",
   "channel": "stable",
   "name": "Tool Veo3's Thinh",
-  "notes": "Ban cap nhat moi cua Tool Veo3's Thinh.",
-  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.1/Tool-Veo3s-Thinh-win.zip",
-  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.1/Tool-Veo3s-Thinh-mac.zip"
+  "notes": "Tat preset an toan mac dinh va Viet hoa lai cac nut/chu hien thi chinh tren tool.",
+  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.2/Tool-Veo3s-Thinh-win.zip",
+  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.2/Tool-Veo3s-Thinh-mac.zip"
 }

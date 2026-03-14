@@ -40,7 +40,7 @@ class AddProfileDialog(QDialog):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Them ho so")
+        self.setWindowTitle("Thêm hồ sơ")
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -51,22 +51,22 @@ class AddProfileDialog(QDialog):
         self.email_input = QLineEdit()
         self.user_name_input = QLineEdit()
         self.notes_input = QLineEdit()
-        form.addRow("Ten hien thi", self.nickname_input)
+        form.addRow("Tên hiển thị", self.nickname_input)
         form.addRow("API key", self.api_key_input)
         form.addRow("Email", self.email_input)
-        form.addRow("Ten nguoi dung", self.user_name_input)
-        form.addRow("Ghi chu", self.notes_input)
+        form.addRow("Tên người dùng", self.user_name_input)
+        form.addRow("Ghi chú", self.notes_input)
         layout.addLayout(form)
 
         info = QLabel(
-            "Ho so o day la ho so cuc bo cua app. Browser profile Flow duoc quan ly rieng o phan dang nhap."
+            "Hồ sơ ở đây là hồ sơ cục bộ của app. Browser profile Flow được quản lý riêng ở phần đăng nhập."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
         buttons = QHBoxLayout()
-        add_btn = QPushButton("Them")
-        cancel_btn = QPushButton("Huy")
+        add_btn = QPushButton("Thêm")
+        cancel_btn = QPushButton("Hủy")
         add_btn.clicked.connect(self.accept)
         cancel_btn.clicked.connect(self.reject)
         buttons.addStretch(1)
@@ -103,10 +103,10 @@ class AccountTab(QWidget):
         layout = QVBoxLayout(self)
 
         actions = QHBoxLayout()
-        add_btn = QPushButton("Them ho so")
-        import_btn = QPushButton("Nhap ho so")
-        validate_btn = QPushButton("Kiem tra tat ca")
-        login_btn = QPushButton("Mo trinh duyet dang nhap Flow")
+        add_btn = QPushButton("Thêm hồ sơ")
+        import_btn = QPushButton("Nhập hồ sơ")
+        validate_btn = QPushButton("Kiểm tra tất cả")
+        login_btn = QPushButton("Mở trình duyệt đăng nhập Flow")
         add_btn.clicked.connect(self._add_profile)
         import_btn.clicked.connect(self._import_from_file)
         validate_btn.clicked.connect(self._validate_all)
@@ -124,7 +124,7 @@ class AccountTab(QWidget):
 
         self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
-            ["Ten", "Email", "Nguoi dung", "Trang thai", "Proxy", "Tac vu"]
+            ["Tên", "Email", "Người dùng", "Trạng thái", "Proxy", "Tác vụ"]
         )
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -143,13 +143,13 @@ class AccountTab(QWidget):
         self._refresh_table()
 
     def _import_from_file(self) -> None:
-        file_path, _ = QFileDialog.getOpenFileName(self, "Nhap ho so", "", "Tep JSON (*.json);;Moi tep (*)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Nhập hồ sơ", "", "Tệp JSON (*.json);;Mọi tệp (*)")
         if not file_path:
             return
         try:
             self.auth.import_account_from_file(file_path)
         except Exception as exc:
-            QMessageBox.critical(self, "Nhap ho so", str(exc))
+            QMessageBox.critical(self, "Nhập hồ sơ", str(exc))
             return
         self._refresh_table()
 
@@ -158,7 +158,7 @@ class AccountTab(QWidget):
         for account in self.auth.get_accounts():
             worker = ValidateWorker(self.auth, account["account_id"])
             worker.finished.connect(lambda _result, self=self: self._refresh_table())
-            worker.error.connect(lambda message, self=self: QMessageBox.warning(self, "Kiem tra", message))
+            worker.error.connect(lambda message, self=self: QMessageBox.warning(self, "Kiểm tra", message))
             worker.start()
             self._workers.append(worker)
 
@@ -178,8 +178,8 @@ class AccountTab(QWidget):
             return
         reply = QMessageBox.question(
             self,
-            "Xoa ho so",
-            f"Xoa ho so '{account.get('nickname', account_id)}'?",
+            "Xóa hồ sơ",
+            f"Xóa hồ sơ '{account.get('nickname', account_id)}'?",
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
@@ -189,21 +189,21 @@ class AccountTab(QWidget):
     def _validate_one(self, account_id: str) -> None:
         worker = ValidateWorker(self.auth, account_id)
         worker.finished.connect(lambda _result, self=self: self._refresh_table())
-        worker.error.connect(lambda message, self=self: QMessageBox.warning(self, "Kiem tra", message))
+        worker.error.connect(lambda message, self=self: QMessageBox.warning(self, "Kiểm tra", message))
         worker.start()
         self._workers.append(worker)
 
     def _open_login_browser(self) -> None:
         if not self.browser_assist:
-            QMessageBox.warning(self, "Trinh duyet", "Chua cau hinh trinh duyet.")
+            QMessageBox.warning(self, "Trình duyệt", "Chưa cấu hình trình duyệt.")
             return
         try:
             self.browser_assist.launch_login_browser()
         except Exception as exc:
             QMessageBox.critical(
                 self,
-                "Dang nhap Flow",
-                f"Khong mo duoc trinh duyet dang nhap.\n\nChi tiet: {exc}",
+                "Đăng nhập Flow",
+                f"Không mở được trình duyệt đăng nhập.\n\nChi tiết: {exc}",
             )
             return
         self._sync_browser_identity()
@@ -213,24 +213,24 @@ class AccountTab(QWidget):
         self._identity_timer.start()
         self.browser_info.setText(
             self.browser_info.text()
-            + "\n\nDa mo cua so dang nhap Flow. Sau khi dang nhap xong, app se tu doc email va cap nhat bang ho so."
+            + "\n\nĐã mở cửa sổ đăng nhập Flow. Sau khi đăng nhập xong, app sẽ tự đọc email và cập nhật bảng hồ sơ."
         )
 
     def _refresh_browser_info(self) -> None:
         if not self.browser_assist:
-            self.browser_info.setText("Chua cau hinh trinh duyet.")
+            self.browser_info.setText("Chưa cấu hình trình duyệt.")
             return
         env = self.browser_assist.describe_environment()
-        email = env.get("email") or "Chua phat hien"
-        user_name = env.get("user_name") or "Chua phat hien"
+        email = env.get("email") or "Chưa phát hiện"
+        user_name = env.get("user_name") or "Chưa phát hiện"
         self.browser_info.setText(
-            "Profile trinh duyet dang dung:\n"
-            f"Duong dan Chrome: {env['browser_path'] or '(tu nhan dien)'}\n"
-            f"Thu muc du lieu Chrome: {env['chrome_user_data_dir']}\n"
-            f"Ten profile Chrome: {env['chrome_profile_dir']}\n"
-            f"Thu muc tai xuong: {env['downloads_dir']}\n"
-            f"Email dang nhap hien tai: {email}\n"
-            f"Ten nguoi dung: {user_name}"
+            "Profile trình duyệt đang dùng:\n"
+            f"Đường dẫn Chrome: {env['browser_path'] or '(tự nhận diện)'}\n"
+            f"Thư mục dữ liệu Chrome: {env['chrome_user_data_dir']}\n"
+            f"Tên profile Chrome: {env['chrome_profile_dir']}\n"
+            f"Thư mục tải xuống: {env['downloads_dir']}\n"
+            f"Email đăng nhập hiện tại: {email}\n"
+            f"Tên người dùng: {user_name}"
         )
 
     def _refresh_table(self) -> None:
@@ -247,9 +247,9 @@ class AccountTab(QWidget):
             action_widget = QWidget()
             action_layout = QHBoxLayout(action_widget)
             action_layout.setContentsMargins(0, 0, 0, 0)
-            validate_btn = QPushButton("Kiem tra")
+            validate_btn = QPushButton("Kiểm tra")
             proxy_btn = QPushButton("Proxy")
-            remove_btn = QPushButton("Xoa")
+            remove_btn = QPushButton("Xóa")
             validate_btn.clicked.connect(lambda _checked=False, aid=account["account_id"]: self._validate_one(aid))
             proxy_btn.clicked.connect(lambda _checked=False, aid=account["account_id"]: self._set_proxy(aid))
             remove_btn.clicked.connect(lambda _checked=False, aid=account["account_id"]: self._remove_account(aid))

@@ -45,11 +45,11 @@ class HelpTab(QWidget):
             ),
             (
                 "4. Tạo video",
-                "Vào tab Video VEO3. Nếu muốn ổn định nhất, hãy bấm Preset an toàn trước, sau đó nhập mô tả và bấm Tạo ngay bây giờ👍.",
+                "Vào tab Video VEO3. Nếu muốn ổn định nhất, hãy bật preset an toàn trước, sau đó nhập mô tả và bấm Tạo ngay bây giờ 👍.",
             ),
             (
                 "5. Tạo ảnh",
-                "Vào tab Ảnh Flow. Nếu muốn ít lỗi nhất, hãy bấm Preset an toàn. Nếu cần bám theo bố cục sẵn có, hãy thêm ảnh tham chiếu.",
+                "Vào tab Ảnh Flow. Nếu muốn ít lỗi nhất, hãy bật preset an toàn. Nếu cần bám theo bố cục sẵn có, hãy thêm ảnh tham chiếu.",
             ),
             (
                 "6. Tạo hàng loạt",

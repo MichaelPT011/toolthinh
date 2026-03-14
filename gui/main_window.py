@@ -67,14 +67,14 @@ class StartupWaitDialog(QDialog):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Khoi dong")
+        self.setWindowTitle("Khởi động")
         self.setModal(True)
         self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
         self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
         self.setMinimumWidth(420)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
-        self.label = QLabel("Vui long cho de kiem tra cap nhat...")
+        self.label = QLabel("Vui lòng chờ để kiểm tra cập nhật...")
         self.label.setWordWrap(True)
         layout.addWidget(self.label)
 
@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
         self._apply_theme()
         self._init_ui()
         self._init_menu()
-        self.statusBar().showMessage("San sang")
+        self.statusBar().showMessage("Sẵn sàng")
         if os.environ.get("QT_QPA_PLATFORM", "").lower() != "offscreen":
             QTimer.singleShot(0, self._auto_check_updates)
 
@@ -288,19 +288,19 @@ class MainWindow(QMainWindow):
         self.account_tab = AccountTab(self.auth, getattr(self.video_gen, "browser_assist", None))
         self.help_tab = HelpTab(self)
         self.tabs.addTab(self.video_tab, "Video VEO3")
-        self.tabs.addTab(self.flow_tab, "Anh Flow")
-        self.tabs.addTab(self.concat_tab, "Ghep video")
-        self.tabs.addTab(self.account_tab, "Tai khoan")
-        self.tabs.addTab(self.help_tab, "Huong dan")
+        self.tabs.addTab(self.flow_tab, "Ảnh Flow")
+        self.tabs.addTab(self.concat_tab, "Ghép video")
+        self.tabs.addTab(self.account_tab, "Tài khoản")
+        self.tabs.addTab(self.help_tab, "Hướng dẫn")
         self.setCentralWidget(self.tabs)
 
     def _init_menu(self) -> None:
         menubar = self.menuBar()
 
-        file_menu = menubar.addMenu("&Tep")
-        projects_action = QAction("Du an...", self)
-        settings_action = QAction("Cai dat...", self)
-        exit_action = QAction("Thoat", self)
+        file_menu = menubar.addMenu("&Tệp")
+        projects_action = QAction("Dự án...", self)
+        settings_action = QAction("Cài đặt...", self)
+        exit_action = QAction("Thoát", self)
         projects_action.triggered.connect(self._show_projects)
         settings_action.triggered.connect(self._show_settings)
         exit_action.triggered.connect(QApplication.quit)
@@ -309,10 +309,10 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(exit_action)
 
-        tools_menu = menubar.addMenu("&Cong cu")
-        login_browser_action = QAction("Mo trinh duyet dang nhap Flow", self)
-        environment_action = QAction("Kiem tra moi truong", self)
-        output_action = QAction("Mo thu muc dau ra", self)
+        tools_menu = menubar.addMenu("&Công cụ")
+        login_browser_action = QAction("Mở trình duyệt đăng nhập Flow", self)
+        environment_action = QAction("Kiểm tra môi trường", self)
+        output_action = QAction("Mở thư mục đầu ra", self)
         login_browser_action.triggered.connect(self._open_login_browser)
         environment_action.triggered.connect(self._check_environment)
         output_action.triggered.connect(self._open_output)
@@ -395,17 +395,17 @@ class MainWindow(QMainWindow):
     def _on_update_prepared(self, result: object) -> None:
         self._update_prepare_worker = None
         if self._startup_dialog:
-            self._startup_dialog.set_message("Dang dong app de cai ban cap nhat moi...")
-        self.statusBar().showMessage("Dang cai ban cap nhat moi va tu mo lai...", 3000)
+            self._startup_dialog.set_message("Đang đóng app để cài bản cập nhật mới...")
+        self.statusBar().showMessage("Đang cài bản cập nhật mới và tự mở lại...", 3000)
         QApplication.quit()
 
     def _on_update_check_error(self, message: str) -> None:
         self._update_check_worker = None
         self._update_prepare_worker = None
-        self.statusBar().showMessage("Khong kiem tra duoc cap nhat. App van se duoc mo binh thuong.", 4000)
+        self.statusBar().showMessage("Không kiểm tra được cập nhật. App vẫn sẽ được mở bình thường.", 4000)
         self._close_startup_dialog()
         if not self._update_started_from_startup:
-            QMessageBox.warning(self, "Cap nhat", message)
+            QMessageBox.warning(self, "Cập nhật", message)
 
     def _close_startup_dialog(self) -> None:
         self._update_started_from_startup = False
@@ -432,18 +432,18 @@ class MainWindow(QMainWindow):
     def _open_login_browser(self) -> None:
         browser_assist = getattr(self.video_gen, "browser_assist", None)
         if not browser_assist:
-            QMessageBox.warning(self, "Trinh duyet", "Chua cau hinh trinh duyet.")
+            QMessageBox.warning(self, "Trình duyệt", "Chưa cấu hình trình duyệt.")
             return
         try:
             browser_assist.launch_login_browser()
         except Exception as exc:
             QMessageBox.critical(
                 self,
-                "Dang nhap Flow",
-                f"Khong mo duoc trinh duyet dang nhap.\n\nChi tiet: {exc}",
+                "Đăng nhập Flow",
+                f"Không mở được trình duyệt đăng nhập.\n\nChi tiết: {exc}",
             )
             return
-        self.statusBar().showMessage("Da mo trinh duyet dang nhap Flow", 4000)
+        self.statusBar().showMessage("Đã mở trình duyệt đăng nhập Flow", 4000)
 
     def _check_environment(self) -> None:
         from gui.settings_dialog import load_settings
@@ -453,11 +453,11 @@ class MainWindow(QMainWindow):
 
         browser_assist = getattr(self.video_gen, "browser_assist", None)
         if not browser_assist:
-            QMessageBox.warning(self, "Kiem tra moi truong", "Khong tim thay browser assistant de chay kiem tra.")
+            QMessageBox.warning(self, "Kiểm tra môi trường", "Không tìm thấy browser assistant để chạy kiểm tra.")
             return
 
         checker = EnvironmentChecker(load_settings(), browser_assist, self.auth)
-        self.statusBar().showMessage("Dang kiem tra moi truong...", 4000)
+        self.statusBar().showMessage("Đang kiểm tra môi trường...", 4000)
         self._environment_check_worker = EnvironmentCheckWorker(checker)
         self._environment_check_worker.finished.connect(self._on_environment_checked)
         self._environment_check_worker.error.connect(self._on_environment_check_error)
@@ -474,4 +474,4 @@ class MainWindow(QMainWindow):
 
     def _on_environment_check_error(self, message: str) -> None:
         self._environment_check_worker = None
-        QMessageBox.warning(self, "Kiem tra moi truong", message)
+        QMessageBox.warning(self, "Kiểm tra môi trường", message)
