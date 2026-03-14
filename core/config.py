@@ -23,6 +23,8 @@ UPDATE_CACHE_DIR = DATA_DIR / "updates"
 VERSION_FILE = ROOT_DIR / "version.json"
 BUNDLED_CHROME_DIR = ROOT_DIR / "chrome-win64"
 BUNDLED_CHROME_NESTED_DIR = ROOT_DIR / "chrome-win64" / "chrome-win64"
+BUNDLED_CHROME_INTERNAL_DIR = ROOT_DIR / "_internal" / "chrome-win64"
+BUNDLED_CHROME_INTERNAL_NESTED_DIR = ROOT_DIR / "_internal" / "chrome-win64" / "chrome-win64"
 CHROME_FOR_TESTING_JSON_URL = (
     "https://googlechromelabs.github.io/chrome-for-testing/"
     "last-known-good-versions-with-downloads.json"

@@ -36,23 +36,35 @@ logger = logging.getLogger(__name__)
 def _handle_update_cli(argv: list[str]) -> int | None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--apply-update", action="store_true")
+    parser.add_argument("--smoke-login-browser", action="store_true")
     parser.add_argument("--pid", type=int, default=0)
     parser.add_argument("--zip", dest="zip_path", default="")
     parser.add_argument("--target", dest="target_dir", default="")
     parser.add_argument("--restart", dest="restart_path", default="")
     args, _unknown = parser.parse_known_args(argv)
-    if not args.apply_update:
-        return None
+    if args.apply_update:
+        from core.updater import apply_update
 
-    from core.updater import apply_update
+        apply_update(
+            Path(args.zip_path),
+            Path(args.target_dir),
+            Path(args.restart_path),
+            args.pid,
+        )
+        return 0
 
-    apply_update(
-        Path(args.zip_path),
-        Path(args.target_dir),
-        Path(args.restart_path),
-        args.pid,
-    )
-    return 0
+    if args.smoke_login_browser:
+        from core.browser_assist import BrowserAssist
+        from core.config import ensure_dirs
+        from gui.settings_dialog import load_settings
+
+        ensure_dirs()
+        browser_assist = BrowserAssist(load_settings())
+        browser_assist.launch_login_browser()
+        logger.info("Smoke login browser launched successfully")
+        return 0
+
+    return None
 
 
 def _run_startup_update_check(app, settings: dict) -> int | None:

@@ -18,6 +18,8 @@ from pathlib import Path
 from core.browser_installer import BrowserInstallError, BrowserInstaller
 from core.config import (
     BUNDLED_CHROME_DIR,
+    BUNDLED_CHROME_INTERNAL_DIR,
+    BUNDLED_CHROME_INTERNAL_NESTED_DIR,
     BUNDLED_CHROME_NESTED_DIR,
     FLOW_HOME_URL,
     FLOW_LOGIN_URL,
@@ -93,6 +95,12 @@ class BrowserAssist:
         browser_path = self._resolve_browser_path(allow_install=True)
         user_data_dir = self._effective_user_data_dir()
         profile_dir = self._effective_profile_dir()
+        logger.info(
+            "launch_login_browser start browser=%s user_data_dir=%s profile_dir=%s",
+            browser_path,
+            user_data_dir,
+            profile_dir,
+        )
         if browser_path:
             self._close_existing_managed_browser(browser_path, user_data_dir)
             self._prepare_login_profile(user_data_dir, profile_dir)
@@ -118,8 +126,10 @@ class BrowserAssist:
                     FLOW_LOGIN_URL,
                 ]
             )
-            self._launch_browser(args)
+            self._launch_browser(args, center_window=True, browser_path=browser_path)
+            logger.info("launch_login_browser opened managed browser")
             return
+        logger.info("launch_login_browser fallback webbrowser.open")
         webbrowser.open(FLOW_LOGIN_URL)
 
     def describe_environment(self) -> dict:
@@ -283,6 +293,8 @@ class BrowserAssist:
         bundled_candidates = [
             BUNDLED_CHROME_DIR / "chrome.exe",
             BUNDLED_CHROME_NESTED_DIR / "chrome.exe",
+            BUNDLED_CHROME_INTERNAL_DIR / "chrome.exe",
+            BUNDLED_CHROME_INTERNAL_NESTED_DIR / "chrome.exe",
         ]
         for candidate in bundled_candidates:
             if candidate.exists():
@@ -328,6 +340,8 @@ class BrowserAssist:
         bundled_paths = {
             (BUNDLED_CHROME_DIR / "chrome.exe").resolve(),
             (BUNDLED_CHROME_NESTED_DIR / "chrome.exe").resolve(),
+            (BUNDLED_CHROME_INTERNAL_DIR / "chrome.exe").resolve(),
+            (BUNDLED_CHROME_INTERNAL_NESTED_DIR / "chrome.exe").resolve(),
         }
         managed_browser_root = MANAGED_BROWSER_DIR.resolve()
         if browser_file and (browser_file in bundled_paths or managed_browser_root in browser_file.parents):
@@ -379,13 +393,18 @@ class BrowserAssist:
             "try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} "
             "}"
         )
-        subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        try:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=8,
+            )
+        except subprocess.TimeoutExpired:
+            logger.warning("Timed out closing existing managed browser for %s", user_data_dir)
         time.sleep(0.8)
+        logger.info("Closed existing managed browser processes for %s", user_data_dir)
 
     def _launch_browser(
         self,
@@ -394,6 +413,7 @@ class BrowserAssist:
         center_window: bool = False,
         browser_path: str | None = None,
     ) -> None:
+        logger.info("Launching browser center=%s path=%s", center_window, browser_path or args[0])
         existing_pids = self._list_browser_pids(browser_path or args[0]) if center_window else set()
         subprocess.Popen(args)
         if center_window:
