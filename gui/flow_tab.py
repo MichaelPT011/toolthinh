@@ -86,53 +86,53 @@ class FlowTab(QWidget):
 
         account_row = QHBoxLayout()
         self.account_combo = QComboBox()
-        refresh_btn = QPushButton("Tải lại")
+        refresh_btn = QPushButton("Tai lai")
         refresh_btn.clicked.connect(self.reload_accounts)
         account_row.addWidget(self.account_combo)
         account_row.addWidget(refresh_btn)
         account_widget = QWidget()
         account_widget.setLayout(account_row)
-        form.addRow("Hồ sơ đang dùng", account_widget)
+        form.addRow("Ho so dang dung", account_widget)
 
         self.prompt_input = QPlainTextEdit()
-        self.prompt_input.setPlaceholderText("Mô tả ảnh bạn muốn tạo")
+        self.prompt_input.setPlaceholderText("Mo ta anh ban muon tao")
         self.prompt_input.setMinimumHeight(120)
-        form.addRow("Mô tả ảnh", self.prompt_input)
+        form.addRow("Mo ta anh", self.prompt_input)
 
         self.num_images_spin = QSpinBox()
         self.num_images_spin.setRange(1, 4)
         self.num_images_spin.setValue(1)
-        form.addRow("Số ảnh tải về", self.num_images_spin)
+        form.addRow("So anh tai ve", self.num_images_spin)
 
         self.quality_combo = QComboBox()
         self.quality_combo.addItems(["1080p", "2K", "4K"])
-        form.addRow("Chất lượng tải", self.quality_combo)
+        form.addRow("Chat luong tai", self.quality_combo)
 
         self.orientation_combo = QComboBox()
         self.orientation_combo.addItem("Ngang (16:9)", "landscape")
-        self.orientation_combo.addItem("Dọc (9:16)", "portrait")
-        form.addRow("Khung hình", self.orientation_combo)
+        self.orientation_combo.addItem("Doc (9:16)", "portrait")
+        form.addRow("Khung hinh", self.orientation_combo)
 
-        self.reference_label = QLabel("Chưa chọn ảnh tham chiếu")
+        self.reference_label = QLabel("Chua chon anh tham chieu")
         ref_row = QHBoxLayout()
         ref_row.setContentsMargins(0, 0, 0, 0)
         ref_row.addWidget(self.reference_label, 1)
-        ref_browse = QPushButton("Chọn ảnh")
-        ref_clear = QPushButton("Xóa")
+        ref_browse = QPushButton("Chon anh")
+        ref_clear = QPushButton("Xoa")
         ref_browse.clicked.connect(self._browse_reference_image)
         ref_clear.clicked.connect(self._clear_reference_image)
         ref_row.addWidget(ref_browse)
         ref_row.addWidget(ref_clear)
         ref_widget = QWidget()
         ref_widget.setLayout(ref_row)
-        form.addRow("Ảnh tham chiếu", ref_widget)
+        form.addRow("Anh tham chieu", ref_widget)
         layout.addLayout(form)
 
         actions = QHBoxLayout()
-        self.safe_preset_btn = QCheckBox("Đang dùng preset an toàn")
-        self.batch_btn = QPushButton("Tạo hàng loạt ⛓️")
-        self.gen_btn = QPushButton("Tạo ngay bây giờ👍")
-        self.stop_btn = QPushButton("Dừng")
+        self.safe_preset_btn = QCheckBox("Dang dung preset an toan")
+        self.batch_btn = QPushButton("Tao hang loat ⛓️")
+        self.gen_btn = QPushButton("Tao ngay bay gio👍")
+        self.stop_btn = QPushButton("Dung")
         self.stop_btn.setEnabled(False)
         self.safe_preset_btn.setChecked(True)
         self.safe_preset_btn.toggled.connect(self._on_safe_preset_toggled)
@@ -158,7 +158,7 @@ class FlowTab(QWidget):
         self.batch_widget.setVisible(False)
         layout.addWidget(self.batch_widget)
 
-        self.safe_hint = QLabel("Preset an toàn ảnh: 1 ảnh, 1080p, ngang, batch song song 2.")
+        self.safe_hint = QLabel("Preset an toan anh: 1 anh, 1080p, ngang, batch song song 2.")
         self.safe_hint.setWordWrap(True)
         layout.addWidget(self.safe_hint)
 
@@ -173,7 +173,7 @@ class FlowTab(QWidget):
         layout.addWidget(self.progress_label)
 
         self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["#", "Mô tả", "Trạng thái", "Tệp đầu ra", "Bắt đầu"])
+        self.table.setHorizontalHeaderLabels(["#", "Mo ta", "Trang thai", "Tep dau ra", "Bat dau"])
         self.table.setAlternatingRowColors(True)
         self.table.setWordWrap(False)
         self.table.setMinimumHeight(220)
@@ -188,7 +188,9 @@ class FlowTab(QWidget):
 
         self.scroll.setWidget(container)
         outer.addWidget(self.scroll)
+
         self._on_safe_preset_toggled(True)
+        self._refresh_batch_button_style()
 
     def reload_accounts(self) -> None:
         current = self.account_combo.currentData()
@@ -196,28 +198,29 @@ class FlowTab(QWidget):
             self.auth.ensure_browser_profile_account()
         self.account_combo.clear()
         for account in self.auth.get_active_accounts():
-            self.account_combo.addItem(account.get("nickname", "Hồ sơ"), account["account_id"])
+            self.account_combo.addItem(account.get("nickname", "Ho so"), account["account_id"])
         if self.account_combo.count() == 0:
-            self.account_combo.addItem("Chưa đăng nhập Flow/VEO3", None)
+            self.account_combo.addItem("Chua dang nhap Flow/VEO3", None)
         if current:
             index = self.account_combo.findData(current)
             if index >= 0:
                 self.account_combo.setCurrentIndex(index)
 
     def _browse_reference_image(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Chọn ảnh tham chiếu", "", "Tệp ảnh (*.png *.jpg *.jpeg *.webp)")
+        path, _ = QFileDialog.getOpenFileName(self, "Chon anh tham chieu", "", "Tep anh (*.png *.jpg *.jpeg *.webp)")
         if path:
             self.reference_image_path = path
             self.reference_label.setText(Path(path).name)
 
     def _clear_reference_image(self) -> None:
         self.reference_image_path = None
-        self.reference_label.setText("Chưa chọn ảnh tham chiếu")
+        self.reference_label.setText("Chua chon anh tham chieu")
 
     def _toggle_batch(self) -> None:
         visible = not self.batch_widget.isVisible()
         self.batch_widget.setVisible(visible)
-        self.batch_btn.setText("Ẩn tạo hàng loạt" if visible else "Tạo hàng loạt ⛓️")
+        self.batch_btn.setText("An tao hang loat" if visible else "Tao hang loat ⛓️")
+        self._refresh_batch_button_style()
         if visible:
             self.batch_widget.refresh_from_parent()
             QTimer.singleShot(0, lambda: self.scroll.ensureWidgetVisible(self.batch_widget))
@@ -235,18 +238,40 @@ class FlowTab(QWidget):
             self.batch_widget.mode_combo.setCurrentIndex(mode_index)
         self.batch_widget.concurrent_spin.setValue(int(SAFE_IMAGE_PRESET["batch_concurrent"]))
         if not startup:
-            self.progress_label.setText("Đã áp dụng preset an toàn cho tab Ảnh.")
+            self.progress_label.setText("Da ap dung preset an toan cho tab Anh.")
 
     def _on_safe_preset_toggled(self, checked: bool) -> None:
         if checked:
             self._apply_safe_preset(startup=True)
-            self.progress_label.setText("Đang dùng preset an toàn cho tab Ảnh.")
+            self.progress_label.setText("Dang dung preset an toan cho tab Anh.")
         self.num_images_spin.setEnabled(not checked)
         self.quality_combo.setEnabled(not checked)
         self.orientation_combo.setEnabled(not checked)
         self.batch_widget.mode_combo.setEnabled(not checked)
         self.batch_widget.concurrent_spin.setEnabled(not checked)
-        self.safe_preset_btn.setText("Đang dùng preset an toàn" if checked else "Dùng preset an toàn")
+        self.safe_preset_btn.setText("Dang dung preset an toan" if checked else "Dung preset an toan")
+        self._refresh_safe_preset_style()
+
+    def _refresh_safe_preset_style(self) -> None:
+        if self.safe_preset_btn.isChecked():
+            self.safe_preset_btn.setStyleSheet(
+                "QCheckBox { background: #ecfdf5; border: 1px solid #16a34a; "
+                "border-radius: 10px; padding: 8px 12px; color: #166534; font-weight: 700; }"
+            )
+            return
+        self.safe_preset_btn.setStyleSheet(
+            "QCheckBox { background: #ffffff; border: 1px solid #cbd5e1; "
+            "border-radius: 10px; padding: 8px 12px; color: #0f172a; font-weight: 600; }"
+        )
+
+    def _refresh_batch_button_style(self) -> None:
+        if self.batch_widget.isVisible():
+            self.batch_btn.setStyleSheet(
+                "QPushButton { background: #64748b; border-color: #64748b; color: white; } "
+                "QPushButton:hover { background: #475569; border-color: #475569; }"
+            )
+            return
+        self.batch_btn.setStyleSheet("")
 
     def _generation_readiness_warning(self) -> str | None:
         if self.browser_assist and self.browser_assist.has_browser_profile_data():
@@ -256,15 +281,15 @@ class FlowTab(QWidget):
             return None
         if not self.auth.get_active_accounts() or not self.account_combo.currentData():
             return (
-                "Bạn chưa đăng nhập Flow/VEO3.\n\n"
-                "Hãy vào tab Tài khoản, bấm Mở trình duyệt đăng nhập Flow, "
-                "đăng nhập xong rồi quay lại tạo."
+                "Ban chua dang nhap Flow/VEO3.\n\n"
+                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
+                "dang nhap xong roi quay lai tao."
             )
         if self.browser_assist and not self.browser_assist.has_browser_profile_data():
             return (
-                "Bạn chưa đăng nhập Flow/VEO3 trong browser của app.\n\n"
-                "Hãy vào tab Tài khoản, bấm Mở trình duyệt đăng nhập Flow, "
-                "đăng nhập xong rồi quay lại tạo."
+                "Ban chua dang nhap Flow/VEO3 trong browser cua app.\n\n"
+                "Hay vao tab Tai khoan, bam Mo trinh duyet dang nhap Flow, "
+                "dang nhap xong roi quay lai tao."
             )
         return None
 
@@ -276,7 +301,7 @@ class FlowTab(QWidget):
             QMessageBox.warning(self, "Anh Flow", readiness_warning)
             return
         if not prompt or not account_id:
-            QMessageBox.warning(self, "Ảnh Flow", "Hãy nhập mô tả ảnh và chọn hồ sơ.")
+            QMessageBox.warning(self, "Anh Flow", "Hay nhap mo ta anh va chon ho so.")
             return
 
         if not getattr(self.flow_gen, "flow_automation", None):
@@ -287,7 +312,7 @@ class FlowTab(QWidget):
         self.progress.setVisible(True)
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
-        self.progress_label.setText("Đang chuẩn bị gửi yêu cầu tạo ảnh...")
+        self.progress_label.setText("Dang chuan bi gui yeu cau tao anh...")
         self._current_row = self._start_job_row(prompt)
 
         self._worker = FlowWorker(
@@ -310,14 +335,14 @@ class FlowTab(QWidget):
     def _stop_current_job(self) -> None:
         if self._worker:
             self.stop_btn.setEnabled(False)
-            self.progress_label.setText("Đang dừng tác vụ ảnh...")
+            self.progress_label.setText("Dang dung tac vu anh...")
             self._worker.request_cancel()
 
     def _on_progress(self, value: int) -> None:
         self.progress.setVisible(True)
         self.progress.setValue(max(0, min(100, value)))
         if self._current_row is not None:
-            self._set_job_row_status(self._current_row, f"Đang chạy {max(0, min(100, value))}%")
+            self._set_job_row_status(self._current_row, f"Dang chay {max(0, min(100, value))}%")
 
     def _on_status(self, text: str) -> None:
         self.progress_label.setText(text)
@@ -331,10 +356,10 @@ class FlowTab(QWidget):
             if job.get("status") == "completed":
                 self.progress.setVisible(True)
                 self.progress.setValue(100)
-                self.progress_label.setText(f"Đã tạo xong và tải về {len(job.get('output_paths', []))} ảnh.")
+                self.progress_label.setText(f"Da tao xong va tai ve {len(job.get('output_paths', []))} anh.")
             else:
                 self.progress.setVisible(False)
-                self.progress_label.setText(job.get("error", "") or f"Kết thúc với trạng thái: {job.get('status', '')}")
+                self.progress_label.setText(job.get("error", "") or f"Ket thuc voi trang thai: {job.get('status', '')}")
             self._finish_job_row(job)
         else:
             self.progress.setVisible(False)
@@ -350,7 +375,7 @@ class FlowTab(QWidget):
             self._set_job_row_status(self._current_row, "failed")
             self._set_job_row_output(self._current_row, message)
         self._current_row = None
-        QMessageBox.critical(self, "Ảnh Flow", message)
+        QMessageBox.critical(self, "Anh Flow", message)
 
     def _on_cancelled(self, message: str) -> None:
         self.gen_btn.setEnabled(True)
@@ -367,7 +392,7 @@ class FlowTab(QWidget):
         self.table.insertRow(row)
         self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         self.table.setItem(row, 1, QTableWidgetItem(prompt))
-        self.table.setItem(row, 2, QTableWidgetItem("Đang khởi tạo..."))
+        self.table.setItem(row, 2, QTableWidgetItem("Dang khoi tao..."))
         self.table.setItem(row, 3, QTableWidgetItem(""))
         self.table.setItem(row, 4, QTableWidgetItem(""))
         return row
@@ -397,7 +422,7 @@ class FlowTab(QWidget):
         rows: list[dict] = []
 
         if sequence_files and len(sequence_files) not in {1, len(prompts)}:
-            raise ValueError("Batch ảnh tham chiếu cần đúng 1 ảnh dùng chung hoặc đúng bằng số prompt.")
+            raise ValueError("Batch anh tham chieu can dung 1 anh dung chung hoac dung bang so prompt.")
 
         for index, prompt in enumerate(prompts):
             image_path = None
@@ -415,7 +440,7 @@ class FlowTab(QWidget):
                         "download_quality": self.quality_combo.currentText(),
                         "orientation": self.orientation_combo.currentData(),
                     },
-                    "source_label": Path(image_path).name if image_path else "Không dùng ảnh tham chiếu",
+                    "source_label": Path(image_path).name if image_path else "Khong dung anh tham chieu",
                     "gen_type": "flow",
                 }
             )
@@ -423,6 +448,6 @@ class FlowTab(QWidget):
 
     def _describe_batch_logic(self) -> str:
         return (
-            "Ảnh hàng loạt: nếu bạn nạp 1 ảnh thì toàn bộ prompt dùng chung ảnh đó. "
-            "Nếu nạp nhiều ảnh thì prompt thứ N sẽ đi với ảnh thứ N."
+            "Anh hang loat: neu ban nap 1 anh thi toan bo prompt dung chung anh do. "
+            "Neu nap nhieu anh thi prompt thu N se di voi anh thu N."
         )

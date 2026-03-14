@@ -1,8 +1,8 @@
 {
-  "version": "2026.03.13.8",
+  "version": "2026.03.14.1",
   "channel": "stable",
   "name": "Tool Veo3's Thinh",
-  "notes": "Ban cap nhat moi cua Tool Veo3's Thinh.",
-  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.13.8/Tool-Veo3s-Thinh-win.zip",
-  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.13.8/Tool-Veo3s-Thinh-mac.zip"
+  "notes": "Sua video detail/download, extend chain, doc email profile, preset an toan va live retest toan bo flow chinh.",
+  "windows_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.1/Tool-Veo3s-Thinh-win.zip",
+  "mac_url": "https://github.com/MichaelPT011/toolthinh/releases/download/v2026.03.14.1/Tool-Veo3s-Thinh-mac.zip"
 }

@@ -1,13 +1,15 @@
-"""Automate Flow video creation using a shared hidden Chrome runtime."""
+"""Automate Flow video creation using a shared Chrome runtime."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from pathlib import Path
+from urllib.parse import urljoin
 
-from core.config import FLOW_HOME_URL
+from core.config import FLOW_HOME_URL, LAST_VIDEO_CONTEXT_FILE
 from core.flow_automation import FlowAutomation
 from core.flow_runtime import FlowBrowserRuntime
 
@@ -15,7 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 class VideoAutomation(FlowAutomation):
-    """Drive Flow video creation without showing a browser window on screen."""
+    """Drive Flow video creation with resilient selectors and shared runtime."""
+
+    def __init__(self, browser_assist) -> None:
+        super().__init__(browser_assist)
+        self._last_video_project_url, self._last_video_detail_url = self._load_last_video_context()
 
     async def generate_videos(
         self,
@@ -38,7 +44,6 @@ class VideoAutomation(FlowAutomation):
         status_callback=None,
     ) -> list[str]:
         del duration
-        del extend_video_path
         PlaywrightError, PlaywrightTimeoutError, _async_playwright = self._load_playwright()
 
         try:
@@ -57,6 +62,7 @@ class VideoAutomation(FlowAutomation):
                         start_image_path=start_image_path,
                         end_image_path=end_image_path,
                         ingredient_paths=ingredient_paths,
+                        extend_video_path=extend_video_path,
                         cancel_event=cancel_event,
                         progress_callback=progress_callback,
                         status_callback=status_callback,
@@ -74,6 +80,7 @@ class VideoAutomation(FlowAutomation):
                 start_image_path=start_image_path,
                 end_image_path=end_image_path,
                 ingredient_paths=ingredient_paths,
+                extend_video_path=extend_video_path,
                 cancel_event=cancel_event,
                 progress_callback=progress_callback,
                 status_callback=status_callback,
@@ -106,6 +113,7 @@ class VideoAutomation(FlowAutomation):
         start_image_path: str | None,
         end_image_path: str | None,
         ingredient_paths: list[str] | None,
+        extend_video_path: str | None,
         cancel_event: asyncio.Event | None,
         progress_callback,
         status_callback,
@@ -114,23 +122,38 @@ class VideoAutomation(FlowAutomation):
         output_dir.mkdir(parents=True, exist_ok=True)
         saved_paths: list[str] = []
 
-        # Flow is much less stable with x2/x3/x4 video output buttons.
-        # We keep the user-facing count, but produce it as repeated x1 runs.
+        if mode == "extend":
+            return await self._extend_videos_with_runtime(
+                runtime,
+                prompt,
+                output_dir,
+                prefix,
+                requested=requested,
+                download_quality=download_quality,
+                extend_video_path=extend_video_path,
+                cancel_event=cancel_event,
+                progress_callback=progress_callback,
+                status_callback=status_callback,
+            )
+
+        # Flow is unstable with x2/x3/x4 video output buttons. Produce the requested
+        # count as repeated x1 runs while keeping the user-facing output count.
         for output_index in range(requested):
             async with runtime.page() as page:
                 self._ensure_not_cancelled(cancel_event)
                 scoped_progress = self._scoped_progress_callback(progress_callback, output_index, requested)
                 scoped_status = self._scoped_status_callback(status_callback, output_index, requested)
 
-                scoped_status("Đang khởi động Flow video...")
+                scoped_status("Dang khoi dong Flow video...")
                 await page.goto(FLOW_HOME_URL, wait_until="domcontentloaded", timeout=120000)
                 await page.wait_for_timeout(4000)
                 await self._assert_flow_ready(page)
 
                 scoped_progress(5)
-                scoped_status("Đang tạo project video...")
+                scoped_status("Dang tao project video...")
                 await self._open_new_project(page, cancel_event=cancel_event)
                 await page.wait_for_timeout(6000)
+                self._remember_video_context(project_url=page.url)
 
                 self._ensure_not_cancelled(cancel_event)
                 await self._configure_video_options(page, 1, aspect_ratio, mode)
@@ -143,7 +166,7 @@ class VideoAutomation(FlowAutomation):
                     ingredient_paths=ingredient_paths or [],
                 )
                 scoped_progress(12)
-                scoped_status("Đã gửi yêu cầu tạo video lên Flow.")
+                scoped_status("Da gui yeu cau tao video len Flow.")
 
                 prompt_box = page.locator('[role="textbox"]').first
                 await prompt_box.click(force=True)
@@ -169,7 +192,81 @@ class VideoAutomation(FlowAutomation):
                 )
 
         self._emit_progress(progress_callback, 100)
-        self._emit_status(status_callback, f"Đã tải xong {len(saved_paths)}/{requested} video.")
+        self._emit_status(status_callback, f"Da tai xong {len(saved_paths)}/{requested} video.")
+        return saved_paths
+
+    async def _extend_videos_with_runtime(
+        self,
+        runtime: FlowBrowserRuntime,
+        prompt: str,
+        output_dir: Path,
+        prefix: str,
+        *,
+        requested: int,
+        download_quality: str,
+        extend_video_path: str | None,
+        cancel_event: asyncio.Event | None,
+        progress_callback,
+        status_callback,
+    ) -> list[str]:
+        del extend_video_path
+
+        if not self._last_video_project_url and not self._last_video_detail_url:
+            raise RuntimeError(
+                "Chua co project video gan nhat de keo dai. Hay tao it nhat 1 video thanh cong trong app truoc."
+            )
+
+        saved_paths: list[str] = []
+        for output_index in range(requested):
+            async with runtime.page() as page:
+                self._ensure_not_cancelled(cancel_event)
+                scoped_progress = self._scoped_progress_callback(progress_callback, output_index, requested)
+                scoped_status = self._scoped_status_callback(status_callback, output_index, requested)
+
+                detail_url = (self._last_video_detail_url or "").strip()
+                project_url = (self._last_video_project_url or "").strip()
+                if detail_url:
+                    scoped_status("Dang mo clip gan nhat de keo dai...")
+                    await page.goto(detail_url, wait_until="domcontentloaded", timeout=120000)
+                    await page.wait_for_timeout(3500)
+                elif project_url:
+                    scoped_status("Dang mo project video gan nhat de keo dai...")
+                    await page.goto(project_url, wait_until="domcontentloaded", timeout=120000)
+                    await page.wait_for_timeout(5000)
+
+                await self._open_latest_video_for_extend(page, cancel_event, scoped_status)
+
+                scoped_progress(8)
+                scoped_status("Dang chuyen sang che do Keo dai video...")
+                extend_button = page.get_by_role("button").filter(has_text="Extend").first
+                await extend_button.click(force=True)
+                await page.wait_for_timeout(1000)
+
+                prompt_box = page.locator('[role="textbox"]').first
+                await prompt_box.click(force=True)
+                await page.keyboard.press("Control+A")
+                await page.keyboard.type(prompt)
+                await page.wait_for_timeout(1000)
+                await page.get_by_role("button", name="Create").last.click(force=True)
+
+                await self._wait_for_extend_result(page, cancel_event, scoped_progress, scoped_status)
+                self._remember_video_context(project_url=self._project_root_url(page.url), detail_url=page.url)
+
+                output_path = output_dir / f"{output_index + 1}-{prefix}.mp4"
+                saved_paths.append(
+                    await self._download_current_video_detail(
+                        runtime,
+                        page,
+                        output_path,
+                        download_quality,
+                        cancel_event,
+                        scoped_progress,
+                        scoped_status,
+                    )
+                )
+
+        self._emit_progress(progress_callback, 100)
+        self._emit_status(status_callback, f"Da tai xong {len(saved_paths)}/{requested} video keo dai.")
         return saved_paths
 
     def _scoped_progress_callback(self, callback, output_index: int, requested: int):
@@ -199,7 +296,11 @@ class VideoAutomation(FlowAutomation):
         return emit
 
     async def _configure_video_options(self, page, requested: int, aspect_ratio: str, mode: str) -> None:
-        tabs = await self._open_options_panel(page, minimum_tabs=8, error_message="Flow video options panel did not open correctly.")
+        tabs = await self._open_options_panel(
+            page,
+            minimum_tabs=8,
+            error_message="Flow video options panel did not open correctly.",
+        )
 
         await tabs.filter(has_text="videocam").first.click(force=True)
         await page.wait_for_timeout(600)
@@ -232,9 +333,6 @@ class VideoAutomation(FlowAutomation):
         end_image_path: str | None,
         ingredient_paths: list[str],
     ) -> None:
-        if mode == "extend":
-            raise RuntimeError("Flow chưa lộ rõ luồng kéo dài video tự động ổn định trên editor hiện tại.")
-
         file_input = page.locator('input[type="file"]').first
         if await file_input.count() == 0:
             return
@@ -270,8 +368,8 @@ class VideoAutomation(FlowAutomation):
     def _format_failure(self, body: str) -> str:
         match = re.search(r"(\d+)%", body)
         if match:
-            return f"Flow đã submit video nhưng server trả Failed ở khoảng {match.group(1)}%."
-        return "Flow đã submit video nhưng server trả Failed."
+            return f"Flow da submit video nhung server tra Failed o khoang {match.group(1)}%."
+        return "Flow da submit video nhung server tra Failed."
 
     async def _download_videos(
         self,
@@ -288,58 +386,222 @@ class VideoAutomation(FlowAutomation):
     ) -> list[str]:
         saved_paths: list[str] = []
         target_quality = self._video_quality_label(download_quality)
+        project_url = self._project_root_url(page.url)
 
         video_count = await page.locator("video").count()
         if video_count == 0:
-            raise RuntimeError("Flow không hiển thị video nào để tải về.")
+            raise RuntimeError("Flow khong hien thi video nao de tai ve.")
 
         total = min(requested, video_count)
         for index in range(total):
             self._ensure_not_cancelled(cancel_event)
-            self._emit_status(status_callback, f"Đang mở video {index + 1}/{total}...")
-            play_button = page.get_by_role("button").filter(has_text="play_circle").nth(index)
-            await play_button.click(force=True)
-            await page.wait_for_timeout(2500)
+            if self._project_root_url(page.url) != project_url:
+                await page.goto(project_url, wait_until="domcontentloaded", timeout=120000)
+                await page.wait_for_timeout(2500)
 
-            output_path = output_dir / f"{start_index + index + 1}-{prefix}.mp4"
+            self._emit_status(status_callback, f"Dang mo video {index + 1}/{total}...")
+            await self._open_video_detail_from_project(page, index, cancel_event, status_callback)
+
+            output_path = self._reserve_output_path(output_dir / f"{start_index + index + 1}-{prefix}.mp4")
             quality_text = str(download_quality or "1080p").upper()
             async with runtime.download_slot():
                 if quality_text in {"2K", "4K"}:
-                    self._emit_status(status_callback, f"Đang yêu cầu bản upscale {quality_text} cho video {index + 1}/{total}...")
+                    self._emit_status(status_callback, f"Dang yeu cau ban upscale {quality_text} cho video {index + 1}/{total}...")
                 else:
-                    self._emit_status(status_callback, f"Đang tải video {index + 1}/{total}...")
-
-                download_button = page.get_by_role("button", name="Download").first
-                await download_button.click(force=True)
-                await page.wait_for_timeout(500)
-                menu_items = page.locator('[role="menuitem"]')
-                if await menu_items.count():
-                    async with page.expect_download(timeout=180000) as download_info:
-                        preferred = menu_items.filter(has_text=target_quality)
-                        if await preferred.count():
-                            await preferred.first.click(force=True)
-                        else:
-                            fallback = await self._pick_video_download_item(menu_items)
-                            await fallback.click(force=True)
-                    download = await download_info.value
-                else:
-                    async with page.expect_download(timeout=180000) as download_info:
-                        await download_button.click(force=True)
-                    download = await download_info.value
-
-                await download.save_as(str(output_path))
+                    self._emit_status(status_callback, f"Dang tai video {index + 1}/{total}...")
+                await self._download_video_from_detail(page, output_path, target_quality)
 
             saved_paths.append(str(output_path))
             logger.info("Saved Flow video: %s", output_path)
+            self._remember_video_context(project_url=project_url, detail_url=page.url)
             self._emit_progress(progress_callback, int(((index + 1) / max(1, total)) * 100))
-            self._emit_status(status_callback, f"Đã tải xong video {index + 1}/{total}.")
-
-            back_button = page.get_by_role("button", name="Back")
-            if await back_button.count():
-                await back_button.first.click(force=True)
-                await page.wait_for_timeout(1200)
+            self._emit_status(status_callback, f"Da tai xong video {index + 1}/{total}.")
 
         return saved_paths
+
+    async def _download_current_video_detail(
+        self,
+        runtime: FlowBrowserRuntime,
+        page,
+        output_path: Path,
+        download_quality: str,
+        cancel_event: asyncio.Event | None,
+        progress_callback=None,
+        status_callback=None,
+    ) -> str:
+        self._ensure_not_cancelled(cancel_event)
+        output_path = self._reserve_output_path(output_path)
+        quality_text = str(download_quality or "1080p").upper()
+        target_quality = self._video_quality_label(download_quality)
+
+        async with runtime.download_slot():
+            if quality_text in {"2K", "4K"}:
+                self._emit_status(status_callback, f"Dang yeu cau ban upscale {quality_text} cho video keo dai...")
+            else:
+                self._emit_status(status_callback, "Dang tai video keo dai...")
+            await self._download_video_from_detail(page, output_path, target_quality)
+
+        self._remember_video_context(project_url=self._project_root_url(page.url), detail_url=page.url)
+        self._emit_progress(progress_callback, 100)
+        self._emit_status(status_callback, "Da tai xong video keo dai.")
+        return str(output_path)
+
+    async def _download_video_from_detail(self, page, output_path: Path, target_quality: str) -> None:
+        download_button = page.get_by_role("button", name="Download").first
+        await download_button.wait_for(timeout=60000)
+        await download_button.click(force=True)
+        await page.wait_for_timeout(500)
+        menu_items = page.locator('[role="menuitem"]')
+        if await menu_items.count():
+            await self._open_video_download_submenu(page, menu_items, target_quality)
+            menu_items = page.locator('[role="menuitem"]')
+            async with page.expect_download(timeout=180000) as download_info:
+                preferred = await self._pick_video_download_item(menu_items, target_quality)
+                await preferred.click(force=True)
+            download = await download_info.value
+        else:
+            async with page.expect_download(timeout=180000) as download_info:
+                await download_button.click(force=True)
+            download = await download_info.value
+
+        await download.save_as(str(output_path))
+
+    async def _open_video_download_submenu(self, page, menu_items, target_quality: str) -> None:
+        texts = [text.strip() for text in await menu_items.all_inner_texts() if text.strip()]
+        if self._menu_contains_quality(texts):
+            return
+
+        full_video = menu_items.filter(has_text="Full Video")
+        if await full_video.count():
+            await full_video.first.click(force=True)
+            await page.wait_for_timeout(700)
+            menu_items = page.locator('[role="menuitem"]')
+            texts = [text.strip() for text in await menu_items.all_inner_texts() if text.strip()]
+            if self._menu_contains_quality(texts):
+                return
+
+        clip_one = menu_items.filter(has_text="Clip 1")
+        if await clip_one.count():
+            await clip_one.first.click(force=True)
+            await page.wait_for_timeout(700)
+
+    def _menu_contains_quality(self, texts: list[str]) -> bool:
+        normalized = "\n".join(texts)
+        return any(label in normalized for label in ("1080p", "2K", "4K", "720p", "Original Size"))
+
+    async def _open_latest_video_for_extend(self, page, cancel_event: asyncio.Event | None, status_callback) -> None:
+        if "/edit/" in page.url and await page.get_by_role("button").filter(has_text="Extend").count():
+            return
+
+        if self._last_video_detail_url:
+            await page.goto(self._last_video_detail_url, wait_until="domcontentloaded", timeout=120000)
+            await page.wait_for_timeout(2500)
+            if await page.get_by_role("button").filter(has_text="Extend").count():
+                return
+
+        self._emit_status(status_callback, "Dang mo clip gan nhat trong project de keo dai...")
+        await self._open_video_detail_from_project(page, 0, cancel_event, status_callback)
+        if await page.get_by_role("button").filter(has_text="Extend").count():
+            return
+
+        raise RuntimeError(
+            "Khong tim thay clip nao trong project gan nhat de keo dai. Hay tao 1 video thanh cong roi thu lai."
+        )
+
+    async def _open_video_detail_from_project(
+        self,
+        page,
+        index: int,
+        cancel_event: asyncio.Event | None,
+        status_callback,
+    ) -> None:
+        project_url = self._project_root_url(page.url)
+        for _ in range(8):
+            self._ensure_not_cancelled(cancel_event)
+            hrefs = await page.locator('a[href*="/edit/"]').evaluate_all(
+                """
+                (elements) => elements
+                  .map((element) => element.getAttribute('href') || '')
+                  .filter((href) => href.includes('/edit/'))
+                """
+            )
+            if len(hrefs) > index:
+                detail_url = urljoin(page.url, hrefs[index])
+                self._emit_status(status_callback, f"Dang mo trang chi tiet video {index + 1}...")
+                await page.goto(detail_url, wait_until="domcontentloaded", timeout=120000)
+                await page.wait_for_timeout(2500)
+                if await page.get_by_role("button", name="Download").count():
+                    self._remember_video_context(project_url=project_url, detail_url=page.url)
+                    return
+
+            play_text = page.get_by_text("play_circle")
+            if await play_text.count() > index:
+                self._emit_status(status_callback, f"Dang mo overlay video {index + 1}...")
+                await play_text.nth(index).click(force=True)
+                await page.wait_for_timeout(2500)
+                if await page.get_by_role("button", name="Download").count():
+                    self._remember_video_context(project_url=project_url, detail_url=page.url)
+                    return
+
+            if self._project_root_url(page.url) != project_url:
+                await page.goto(project_url, wait_until="domcontentloaded", timeout=120000)
+                await page.wait_for_timeout(1500)
+            else:
+                await page.wait_for_timeout(1500)
+
+        raise RuntimeError("Khong mo duoc trang chi tiet video de tai ve.")
+
+    async def _wait_for_extend_result(
+        self,
+        page,
+        cancel_event: asyncio.Event | None,
+        progress_callback=None,
+        status_callback=None,
+    ) -> None:
+        seen_progress = False
+        stable_failed_seconds = 0
+        ready_without_progress = 0
+        last_progress = -1
+        baseline_video_count = await page.locator("video").count()
+
+        for _ in range(180):
+            self._ensure_not_cancelled(cancel_event)
+            await page.wait_for_timeout(5000)
+            body = await page.locator("body").inner_text()
+            progress = self._extract_progress(body)
+            video_count = await page.locator("video").count()
+            has_failed = "Failed" in body or "Something went wrong." in body
+
+            if progress is not None:
+                seen_progress = True
+                ready_without_progress = 0
+                stable_failed_seconds = 0
+                if progress >= last_progress:
+                    last_progress = progress
+                    self._emit_progress(progress_callback, progress)
+                self._emit_status(status_callback, f"Flow dang keo dai video: {progress}%")
+            elif seen_progress:
+                ready_without_progress += 1
+                self._emit_status(status_callback, "Flow dang hoan tat video keo dai...")
+                if video_count > baseline_video_count:
+                    self._emit_progress(progress_callback, 95)
+                    self._emit_status(status_callback, "Flow da render xong video keo dai. Chuan bi tai...")
+                    return
+                if ready_without_progress >= 3 and not has_failed:
+                    self._emit_progress(progress_callback, 95)
+                    self._emit_status(status_callback, "Flow da render xong video keo dai. Chuan bi tai...")
+                    return
+            else:
+                self._emit_status(status_callback, "Flow dang chuan bi video keo dai...")
+
+            if has_failed and not seen_progress:
+                stable_failed_seconds += 5
+                if stable_failed_seconds >= 180:
+                    raise RuntimeError(self._format_failure(body))
+            else:
+                stable_failed_seconds = 0
+
+        raise RuntimeError("Flow chua hoan tat video keo dai trong thoi gian cho.")
 
     async def _wait_for_video_result(
         self,
@@ -368,19 +630,19 @@ class VideoAutomation(FlowAutomation):
             if progress is not None and progress >= last_reported_progress and progress != last_reported_progress:
                 last_reported_progress = progress
                 self._emit_progress(progress_callback, progress)
-                self._emit_status(status_callback, f"Flow đang render video: {progress}%")
+                self._emit_status(status_callback, f"Flow dang render video: {progress}%")
             elif progress is None:
-                self._emit_status(status_callback, "Flow đang xếp hàng hoặc render video...")
+                self._emit_status(status_callback, "Flow dang xep hang hoac render video...")
 
             if video_count:
                 if video_count >= requested:
                     self._emit_progress(progress_callback, 95)
-                    self._emit_status(status_callback, f"Flow đã render đủ {requested}/{requested} video. Chuẩn bị tải...")
+                    self._emit_status(status_callback, f"Flow da render du {requested}/{requested} video. Chuan bi tai...")
                     return
                 self._emit_progress(progress_callback, min(92, 80 + int((video_count / max(1, requested)) * 12)))
                 self._emit_status(
                     status_callback,
-                    f"Flow đã render {video_count}/{requested} video. App đang chờ đủ số lượng...",
+                    f"Flow da render {video_count}/{requested} video. App dang cho du so luong...",
                 )
 
             has_failed = "Failed" in body or "Something went wrong." in body
@@ -390,13 +652,13 @@ class VideoAutomation(FlowAutomation):
                     raise RuntimeError(self._format_failure(body))
                 self._emit_status(
                     status_callback,
-                    "Flow đang báo trạng thái chưa ổn định. App tiếp tục chờ thêm để tránh fail sớm...",
+                    "Flow dang bao trang thai chua on dinh. App tiep tuc cho them de tranh fail som...",
                 )
             else:
                 stable_failed_seconds = 0
 
         if last_video_count:
-            raise RuntimeError(f"Flow chỉ render được {last_video_count}/{requested} video.")
+            raise RuntimeError(f"Flow chi render duoc {last_video_count}/{requested} video.")
         raise RuntimeError("Flow video did not return a downloadable result.")
 
     def _extract_progress(self, body: str) -> int | None:
@@ -418,8 +680,48 @@ class VideoAutomation(FlowAutomation):
             return "4K"
         return "1080p"
 
-    async def _pick_video_download_item(self, menu_items):
-        priorities = ["1080p", "720p", "4K", "270p"]
+    def _project_root_url(self, url: str) -> str:
+        return str(url).split("/edit/")[0]
+
+    def _load_last_video_context(self) -> tuple[str | None, str | None]:
+        if not LAST_VIDEO_CONTEXT_FILE.exists():
+            return None, None
+        try:
+            data = json.loads(LAST_VIDEO_CONTEXT_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None, None
+        if not isinstance(data, dict):
+            return None, None
+        project_url = str(data.get("project_url") or "").strip() or None
+        detail_url = str(data.get("detail_url") or "").strip() or None
+        return project_url, detail_url
+
+    def _remember_video_context(self, project_url: str | None = None, detail_url: str | None = None) -> None:
+        if project_url is not None:
+            project_url = str(project_url or "").strip() or None
+            self._last_video_project_url = project_url
+        if detail_url is not None:
+            detail_url = str(detail_url or "").strip() or None
+            self._last_video_detail_url = detail_url
+
+        payload = {
+            "project_url": self._last_video_project_url,
+            "detail_url": self._last_video_detail_url,
+        }
+        LAST_VIDEO_CONTEXT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        LAST_VIDEO_CONTEXT_FILE.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    async def _pick_video_download_item(self, menu_items, target_quality: str):
+        normalized_target = str(target_quality or "1080p").strip().lower()
+        if normalized_target == "4k":
+            priorities = ["4K", "2K", "1080p", "720p", "Original Size"]
+        elif normalized_target == "2k":
+            priorities = ["2K", "1080p", "720p", "Original Size"]
+        else:
+            priorities = ["1080p", "720p", "Original Size"]
         for target in priorities:
             candidate = menu_items.filter(has_text=target)
             if await candidate.count():

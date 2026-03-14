@@ -62,6 +62,33 @@ class GoogleAuth:
                 return account
         return self.add_account(nickname=nickname, notes=marker)
 
+    def sync_browser_profile_account(
+        self,
+        *,
+        nickname: str = "Flow mac dinh",
+        email: str = "",
+        user_name: str = "",
+    ) -> dict:
+        self._accounts = [
+            existing
+            for existing in self._accounts
+            if not (
+                existing.get("nickname") == "Default profile"
+                and existing.get("notes") is None
+                and str(existing.get("email") or "").endswith("@local.demo")
+            )
+        ]
+        account = self.ensure_browser_profile_account(nickname=nickname)
+        if email:
+            account["email"] = email.strip()
+        if user_name:
+            account["user_name"] = user_name.strip()
+        if nickname:
+            account["nickname"] = nickname.strip()
+        account["status"] = "active"
+        self._save_accounts()
+        return account
+
     def import_account_from_file(self, file_path: str) -> dict:
         with open(file_path, "r", encoding="utf-8") as handle:
             raw = json.load(handle)

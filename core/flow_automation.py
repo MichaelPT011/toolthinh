@@ -102,6 +102,13 @@ class FlowAutomation:
         requested = max(1, min(int(num_images or 1), 4))
         quality_label = self._download_quality_label(download_quality)
         quality_text = str(download_quality or "1080p").upper()
+        if image_path and quality_label != "1K":
+            self._emit_status(
+                status_callback,
+                "Flow hiện thường chỉ cho tải 1080p với ảnh tham chiếu. App sẽ tự hạ về 1080p để tránh lỗi 2K/4K.",
+            )
+            quality_label = "1K"
+            quality_text = "1080P"
 
         async with runtime.page() as page:
             self._ensure_not_cancelled(cancel_event)

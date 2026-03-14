@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import json
 import logging
 import shutil
 import subprocess
@@ -116,12 +117,15 @@ class BrowserAssist:
         webbrowser.open(FLOW_LOGIN_URL)
 
     def describe_environment(self) -> dict:
+        identity = self.read_profile_identity()
         return {
             "browser_path": self._resolve_browser_path() or "",
             "auto_download_browser": self.can_auto_install_browser(),
             "chrome_user_data_dir": self._effective_user_data_dir(),
             "chrome_profile_dir": self._effective_profile_dir(),
             "downloads_dir": str(Path(self.settings.get("downloads_dir") or Path.home() / "Downloads").expanduser()),
+            "email": identity.get("email") or "",
+            "user_name": identity.get("user_name") or "",
         }
 
     def has_browser_profile_data(self) -> bool:
@@ -142,6 +146,42 @@ class BrowserAssist:
             return any(profile_dir.iterdir())
         except OSError:
             return False
+
+    def read_profile_identity(self) -> dict:
+        profile_dir = Path(self._effective_user_data_dir()).expanduser() / self._effective_profile_dir()
+        preferences_file = profile_dir / "Preferences"
+        if not preferences_file.exists():
+            return {}
+        try:
+            data = json.loads(preferences_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+        account_info = data.get("account_info") or []
+        if isinstance(account_info, list):
+            for account in account_info:
+                if not isinstance(account, dict):
+                    continue
+                email = str(account.get("email") or "").strip()
+                if email:
+                    user_name = (
+                        str(account.get("full_name") or "").strip()
+                        or str(account.get("given_name") or "").strip()
+                    )
+                    return {
+                        "email": email,
+                        "user_name": user_name,
+                        "profile_name": str((data.get("profile") or {}).get("name") or self._effective_profile_dir()).strip(),
+                    }
+
+        profile_name = str((data.get("profile") or {}).get("name") or "").strip()
+        if profile_name:
+            return {
+                "email": "",
+                "user_name": "",
+                "profile_name": profile_name,
+            }
+        return {}
 
     def current_download_snapshot(self, extensions: set[str] | None = None) -> set[Path]:
         download_dir = Path(self.settings.get("downloads_dir") or Path.home() / "Downloads").expanduser()

@@ -1,7 +1,9 @@
-"""Central configuration for the browser-assisted Veo3 desktop clone."""
+"""Central configuration for the browser-assisted Veo3 desktop app."""
 
-from pathlib import Path
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 
 
 def _runtime_root() -> Path:
@@ -27,12 +29,17 @@ CHROME_FOR_TESTING_JSON_URL = (
 )
 
 OFFICIAL_UPDATE_REPO = "MichaelPT011/toolthinh"
-OFFICIAL_UPDATE_MANIFEST_URL = f"https://raw.githubusercontent.com/{OFFICIAL_UPDATE_REPO}/main/latest.json"
-OFFICIAL_RELEASE_PREFIX = f"https://github.com/{OFFICIAL_UPDATE_REPO}/releases/download/"
+OFFICIAL_UPDATE_MANIFEST_URL = (
+    f"https://raw.githubusercontent.com/{OFFICIAL_UPDATE_REPO}/main/latest.json"
+)
+OFFICIAL_RELEASE_PREFIX = (
+    f"https://github.com/{OFFICIAL_UPDATE_REPO}/releases/download/"
+)
 
 ACCOUNTS_FILE = DATA_DIR / "accounts.json"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 PROJECTS_DIR = DATA_DIR / "projects"
+LAST_VIDEO_CONTEXT_FILE = DATA_DIR / "last_video_context.json"
 
 OUTPUT_VIDEOS = OUTPUT_DIR / "videos"
 OUTPUT_IMAGES = OUTPUT_DIR / "images"
@@ -67,7 +74,7 @@ WHISK_TOOL_URL = "https://labs.google/fx/tools/whisk"
 FLOW_HOME_URL = "https://labs.google/fx/tools/flow"
 FLOW_LOGIN_URL = "https://labs.google/fx/vi/tools/flow"
 
-APP_TITLE = "🧠Tool Veo3 của Thịnh"
+APP_TITLE = "Tool Veo3's Thinh"
 
 SAFE_IMAGE_PRESET = {
     "num_images": 1,

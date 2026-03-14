@@ -260,7 +260,14 @@ def _resolve_source_root(extract_dir: Path) -> Path:
     children = [item for item in extract_dir.iterdir() if item.name != "__MACOSX"]
     if len(children) == 1 and children[0].is_dir():
         single = children[0]
-        if (single / "main.py").exists() or (single / "bootstrap.py").exists():
+        if (
+            (single / "main.py").exists()
+            or (single / "bootstrap.py").exists()
+            or (single / "version.json").exists()
+            or (single / "latest.json").exists()
+            or any(path.suffix.lower() == ".exe" for path in single.iterdir())
+            or any(path.suffix.lower() == ".app" for path in single.iterdir())
+        ):
             return single
     return extract_dir
 
