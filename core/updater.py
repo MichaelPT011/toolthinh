@@ -58,13 +58,20 @@ class UpdateManager:
         self._validate_download_url(download_url)
 
         current_version = self.current_version()
+        has_update = self._compare_versions(remote_version, current_version) > 0
+        download_available = True
+        unavailable_reason = ""
+        if has_update:
+            download_available, unavailable_reason = await self._check_download_available(download_url)
         return {
             "current_version": current_version,
             "remote_version": remote_version,
             "notes": str(manifest.get("notes") or "").strip(),
             "download_url": download_url,
             "manifest_url": manifest_url,
-            "has_update": self._compare_versions(remote_version, current_version) > 0,
+            "has_update": has_update and download_available,
+            "download_available": download_available,
+            "unavailable_reason": unavailable_reason,
         }
 
     async def download_package(self, update_info: dict) -> Path:
@@ -158,6 +165,25 @@ class UpdateManager:
                 raise UpdateError(f"Lỗi mạng khi tải gói cập nhật: {exc}") from exc
             return
         shutil.copy2(self._local_path(source), destination)
+
+    async def _check_download_available(self, source: str) -> tuple[bool, str]:
+        if not source.startswith(("http://", "https://")):
+            path = self._local_path(source)
+            return path.exists(), f"Không tìm thấy gói cập nhật cục bộ: {path}"
+
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+                response = await client.head(source)
+                if response.status_code in {200, 206}:
+                    return True, ""
+                if response.status_code == 405:
+                    probe = await client.get(source, headers={"Range": "bytes=0-0"})
+                    if probe.status_code in {200, 206}:
+                        return True, ""
+                    return False, f"Gói cập nhật chưa sẵn sàng (HTTP {probe.status_code})."
+                return False, f"Gói cập nhật chưa sẵn sàng (HTTP {response.status_code})."
+        except httpx.HTTPError as exc:
+            return False, f"Không kiểm tra được gói cập nhật: {exc}"
 
     def _select_download_url(self, manifest: dict) -> str:
         if sys.platform == "win32":

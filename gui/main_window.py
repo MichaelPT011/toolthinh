@@ -375,7 +375,10 @@ class MainWindow(QMainWindow):
             return
 
         if not result.get("has_update"):
-            self.statusBar().showMessage("Ban dang o ban moi nhat.", 3000)
+            if result.get("download_available", True):
+                self.statusBar().showMessage("Bạn đang ở bản mới nhất.", 3000)
+            else:
+                self.statusBar().showMessage("Đã kiểm tra cập nhật. Gói mới chưa sẵn sàng nên app mở bình thường.", 5000)
             self._close_startup_dialog()
             return
 
@@ -400,11 +403,12 @@ class MainWindow(QMainWindow):
         QApplication.quit()
 
     def _on_update_check_error(self, message: str) -> None:
+        was_startup = self._update_started_from_startup
         self._update_check_worker = None
         self._update_prepare_worker = None
         self.statusBar().showMessage("Không kiểm tra được cập nhật. App vẫn sẽ được mở bình thường.", 4000)
         self._close_startup_dialog()
-        if not self._update_started_from_startup:
+        if not was_startup:
             QMessageBox.warning(self, "Cập nhật", message)
 
     def _close_startup_dialog(self) -> None:
