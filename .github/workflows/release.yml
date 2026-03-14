@@ -110,15 +110,6 @@ jobs:
             echo "tag=v$(cat .github-version.txt)" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create latest.json
-        run: |
-          python release_tools/write_latest_json.py \
-            --version "${{ steps.meta.outputs.version }}" \
-            --repo "${{ github.repository }}" \
-            --tag "${{ steps.meta.outputs.tag }}" \
-            --output latest.json \
-            --notes "Ban cap nhat moi cua Tool Veo3's Thinh."
-
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -138,6 +129,13 @@ jobs:
         run: |
           git fetch origin "${{ github.event.repository.default_branch }}"
           git switch "${{ github.event.repository.default_branch }}"
+          git pull --ff-only origin "${{ github.event.repository.default_branch }}"
+          python release_tools/write_latest_json.py \
+            --version "${{ steps.meta.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --tag "${{ steps.meta.outputs.tag }}" \
+            --output latest.json \
+            --notes "Ban cap nhat moi cua Tool Veo3's Thinh."
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add latest.json
